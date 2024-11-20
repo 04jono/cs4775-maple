@@ -2426,6 +2426,8 @@ def probVectTerminalNode(diffs,tree,node):
 				tree_ref_nucl = refIndeces[diff_pos-1]
 				if usingErrorRate and( numMinSeqs == 0):
 					#user has indicated their desired error rates
+					#error rates are only considered when observation comes from the tip
+					#without minor sequences
 
 					#ambiguities can be between either 2 or 3 nucleotides
 					three_nucl = 'dvhb'
@@ -2438,15 +2440,15 @@ def probVectTerminalNode(diffs,tree,node):
 					if diff_type in three_nucl:
 						for i in range(len(updated_ambiguities)):
 							if updated_ambiguities[i]!=0:
-								updated_ambiguities[i] += errorRate/9
+								updated_ambiguities[i] -= errorRate/9
 							else:
-								updated_ambiguities[i]-=errorRate*0.33333
+								updated_ambiguities[i]+=errorRate*0.33333
 					elif diff_type in ambiguities:
 						for i in range(len(updated_ambiguities)):
 							if updated_ambiguities[i]!=0:
-								updated_ambiguities[i] += errorRate*0.33333
+								updated_ambiguities[i] -= errorRate*0.33333
 							else:
-								updated_ambiguities[i]-=errorRate*0.33333
+								updated_ambiguities[i]+=errorRate*0.33333
 					
 					probVect.append((6,tree_ref_nucl,updated_ambiguities))
 				else:
@@ -2485,48 +2487,70 @@ def probVectTerminalNode(diffs,tree,node):
 
 #update the genome list of terminal nodes (useful in case one wants to model errors and the error rate has changed)
 def updateProbVectTerminalNode(probVect,numMinSeqs):
-	if not errorRateSiteSpecific: 
-		errorRate=errorRateGlobal
+	
+	errorRate=errorRateGlobal
+
 	if probVect is None:
 		return None
-	currentPos=0
-	for m in probVect:
-		if m[0]==6 :
-			probs=m[2]
-			sumUnnormalizedVector=0
-			for i in range4:
+	
+	reference_pos=0
+	
+	for entry in probVect:
+		entry_type = entry[0]
+
+		#if the entry is type 6, which is type O, then we have to consider updating
+		#the error rates
+		if entry_type ==6 :
+
+			probs=entry[2]
+			num_ambiguous_nucl = 0
+
+			#counting for the number of ambiguous nucleotides, this is either 2 oe 3
+			for i in range(4):
+
+				#since we scaled all of our values in probVectTerminal node by err * .3333
+				# those that may previously b 0 may now have err * .3333 
 				if probs[i]>0.2:
-					sumUnnormalizedVector+=1
-			if errorRateSiteSpecific: errorRate = errorRates[currentPos]
-			if sumUnnormalizedVector ==2:
-				for i in range4:             # M, instead of [0.5, 0.5, 0, 0] we will now get [0.5- ⅓ε, 0.5- ⅓ε,  ⅓ε,  ⅓ε]
-					if probs[i]<0.2:
-						if numMinSeqs:
-							probs[i]=0.0
+					num_ambiguous_nucl+=1
+				
+			if errorRateSiteSpecific: 
+				errorRate = errorRates[reference_pos]
+				
+			if num_ambiguous_nucl == 2:
+				for i in range(4):             # M, instead of [0.5, 0.5, 0, 0] we will now get [0.5- ⅓ε, 0.5- ⅓ε,  ⅓ε,  ⅓ε]
+					if numMinSeqs == 0:
+						if probs[i]<0.2:
+							probs[i] = 0
 						else:
-							probs[i] = errorRate*0.33333
-					else: #if entry.probs[i]==0.5:
-						if numMinSeqs:
-							probs[i] = 0.5
+							probs[i] = .5
+					else:
+						if probs[i] < 0.2:
+							probs[i] = errorRate * .3333
 						else:
-							probs[i] = 0.5 - errorRate*0.33333
-			elif sumUnnormalizedVector == 3:
-				for i in range4:             # for V instead of [⅓, ⅓, ⅓, 0] we get, [ ⅓ - ε/9,  ⅓ -ε/9,  ⅓ -ε/9,  ⅓ε]
-					if probs[i]<0.2:
-						if numMinSeqs:
-							probs[i] = 0.0
+							probs[i] = 0.5 - (.3333)*errorRate
+
+			elif num_ambiguous_nucl == 3:
+				for i in range(4):             # for V instead of [⅓, ⅓, ⅓, 0] we get, [ ⅓ - ε/9,  ⅓ -ε/9,  ⅓ -ε/9,  ⅓ε]
+					if numMinSeqs == 0:
+						if probs[i]<0.2:
+							probs[i] = 0
 						else:
-							probs[i] = errorRate*0.33333
-					else:  # if entry.probs[i]==⅓:
-						if numMinSeqs:
-							probs[i] = (1.0/3)
+							probs[i] = 1/3.0
+					else:
+						if probs[i] < 0.2:
+							probs[i] = errorRate * .3333
 						else:
-							probs[i] = (1.0/3) - errorRate/9 # ⅓ - ε/9
-			currentPos+=1
-		elif m[0]<4:
-			currentPos+=1
+							probs[i] = 1/3.0 - (.3333)*errorRate
+			reference_pos+=1
+		
+		
+		elif entry_type <4:
+			#the entry type is A,G,C, or T so we just incremenet reference position by 1
+			reference_pos+=1
 		else:
-			currentPos=m[1]
+			#the entry type is type R, the second element stores the last index where
+			#the genome list matches the reference so we can update it to that value
+			reference_pos=entry[1]
 
 
 #Update and normalize the mutation rate matrix, given new mutation counts
