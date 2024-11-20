@@ -2377,64 +2377,6 @@ def probVectTerminalNode(diffs,tree,node):
 	if diffs is None:
 			return [(5,lRef)]
 	#--EXTENSION NOT COVERED IN SECTION 1.1 -------#
-
-
-	# pos=1
-	# probVect=[]
-	# for m in diffs:
-	# 	currPos=m[1]
-	# 	if currPos>pos: #region where the node with branch length bLen is identical to the ref.
-	# 		probVect.append((4,currPos-1))
-	# 		pos=currPos
-	# 	if m[0]=="n" or m[0]=="-": #region with no info, store last position and length.
-	# 		if len(m)>2:
-	# 			length=m[2]
-	# 		else:
-	# 			length=1
-	# 		entry=(5,currPos+length-1)
-	# 		pos=currPos+length
-	# 	elif m[0] in allelesLow:
-	# 		#position at which node allele is sure but is different from the reference.
-	# 		if allelesLow[m[0]]==refIndeces[currPos-1]:
-	# 			print("Warning: alternative nucleotide entry coincides with reference: is the wrong reference being used?")
-	# 			print(m)
-	# 			print()
-	# 			entry=(4,currPos)
-	# 		else:
-	# 			entry=(allelesLow[m[0]],refIndeces[currPos-1])
-	# 		pos=currPos+1
-	# 	else:
-	# 		# non-"n" ambiguity character; for now interpret this as ambiguity instead of as a polymorphism.
-	# 		if onlyNambiguities:
-	# 			# if user asks to, to make things easier, interpret any ambiguity as an "n".
-	# 			entry=(5,currPos)
-	# 		else:
-	# 			#otherwise, store as an "other" scenario, where each nucleotide has its own partial likelihood.
-	# 			if usingErrorRate and (numMinSeqs==0):
-	# 				ambigVect=list(ambiguities[m[0]])
-	# 				sumUnnormalizedVector =  sum([bool(item) for item in ambigVect])
-	# 				if errorRateSiteSpecific: errorRate = errorRates[currPos-1]
-	# 				if sumUnnormalizedVector ==2:
-	# 					for i in range4:             # M, instead of [0.5, 0.5, 0, 0] we will now get [0.5- ⅓ε, 0.5- ⅓ε,  ⅓ε,  ⅓ε]
-	# 						if ambigVect[i]==0:
-	# 							ambigVect[i] = errorRate*0.33333
-	# 						else: #if entry.probs[i]==0.5:
-	# 							ambigVect[i] -= errorRate*0.33333
-	# 				elif sumUnnormalizedVector == 3:
-	# 					for i in range4:             # for V instead of [⅓, ⅓, ⅓, 0] we get, [ ⅓ - ε/9,  ⅓ -ε/9,  ⅓ -ε/9,  ⅓ε]
-	# 						if ambigVect[i] == 0:
-	# 							ambigVect[i] = errorRate*0.33333
-	# 						else:  # if entry.probs[i]==⅓:
-	# 							ambigVect[i] -= errorRate/9 # ⅓ - ε/9
-	# 				entry=(6,refIndeces[currPos-1],ambigVect)
-	# 			else:
-	# 				entry=(6,refIndeces[currPos-1],ambiguities[m[0]])
-	# 		pos=currPos+1
-	# 	probVect.append(entry)
-	# if pos<=lRef:
-	# 	probVect.append((4,lRef))
-	
-	
 	
 	#holds the position we are at in the reference sequence
 	reference_pos=1
@@ -2490,19 +2432,21 @@ def probVectTerminalNode(diffs,tree,node):
 					updated_ambiguities = list(ambiguities[diff_type])
 					if errorRateSiteSpecific: 
 						errorRate = errorRates[diff_pos-1]
-						
+
+					#error rates are multiplied by 0.33333 to match calculations in 
+					#updateProbVectTerminalNode
 					if diff_type in three_nucl:
 						for i in range(len(updated_ambiguities)):
 							if updated_ambiguities[i]!=0:
-								updated_ambiguities[i] += errorRate/3
+								updated_ambiguities[i] += errorRate/9
 							else:
-								updated_ambiguities[i]-=errorRate
+								updated_ambiguities[i]-=errorRate*0.33333
 					elif diff_type in ambiguities:
 						for i in range(len(updated_ambiguities)):
 							if updated_ambiguities[i]!=0:
-								updated_ambiguities[i] += errorRate
+								updated_ambiguities[i] += errorRate*0.33333
 							else:
-								updated_ambiguities[i]-=errorRate
+								updated_ambiguities[i]-=errorRate*0.33333
 					
 					probVect.append((6,tree_ref_nucl,updated_ambiguities))
 				else:
