@@ -2515,7 +2515,7 @@ def updateProbVectTerminalNode(probVect,numMinSeqs):
 				
 			if errorRateSiteSpecific: 
 				errorRate = errorRates[reference_pos]
-				
+
 			if num_ambiguous_nucl == 2:
 				for i in range(4):             # M, instead of [0.5, 0.5, 0, 0] we will now get [0.5- ⅓ε, 0.5- ⅓ε,  ⅓ε,  ⅓ε]
 					if numMinSeqs == 0:
@@ -4242,91 +4242,118 @@ def areVectorsDifferentDebugging(probVect1,probVect2,threshold=0.00001):
 #returns 0 when the 2 sequences are not comparable, otherwise returns 1 if the first is more informative or if they are identical, and 2 otherwise.
 #if onlyFindIdentical (the case sequencing errors are considered) returns 1 if sequences are identical, and 0 otherwise.
 def isMinorSequence(probVect1,probVect2,onlyFindIdentical=False):
-	indexEntry1, indexEntry2, pos = 0, 0, 0
-	entry1=probVect1[indexEntry1]
-	entry2=probVect2[indexEntry2]
-	found1bigger=False
-	found2bigger=False
-	while True:
-		if entry1[0]!=entry2[0]:
+	index1 = 0
+	index2 = 0
+	entry1 = probVect1[index1]
+	entry2 = probVect2[index2]
+	moreInfo1 = False
+	moreInfo2 = False
+	ref_pos = 0
+	while ref_pos < lRef:
+		type_1 = entry1[0]
+		type_2 = entry2[0]
+		
+		if entry1 == entry2:
+			#if it just a regular base incremement the reference_position by 1
+			if type_1 < 4:
+				ref_pos+=1
+			elif type_1 == 5 or type_1 == 4:
+				ref_pos = min(entry1[1],entry2[2])
+			else:
+				#the type is 6
+				for i in range(4):
+					if onlyFindIdentical:
+						#we are only meant to find identical sequences and we found an
+						#inconsistency so we can return 0 immediately
+						if entry1[2][i]!=entry2[2][i]:
+							return 0
+						if entry1[2][i] < 0.1 and entry2[2][i] > 0.1:
+							moreInfo1 = True
+						if entry1[2][i] > 0.1 and entry2[2][i] < 0.1:
+							moreInfo2 = True
+				ref_pos+=1
+		else:
 			if onlyFindIdentical:
+				#in this case we are only meant to find identical sequences
+				#but we have already found an inconsistency
 				return 0
-			elif entry1[0]==5:
-				if entry2[0]==4:
-					pos=min(entry1[1],entry2[1])
+			if type_1 == 5:
+				if type_2 == 4:
+					ref_pos = min(entry1[1],entry2[1])
 				else:
-					pos+=1
-				found2bigger=True
-			elif entry2[0]==5:
-				if entry1[0]==4:
-					pos=min(entry1[1],entry2[1])
+					ref_pos+=1
+				#2 holds more info in this case as sequence of type 5 has no info
+				moreInfo2 = True
+			elif type_2 == 5:
+				if type_1 == 4:
+					ref_pos = min(entry1[1],entry2[1])
 				else:
-					pos+=1
-				found1bigger=True
-			elif entry1[0]==6:
-				if entry2[0]==4:
-					i2=entry1[1]
+					ref_pos+=1
+				#1 holds more info in this case as sequence of type 5 has no info
+				moreInfo1 = True
+			elif type_1 == 6:
+				#if entry2 matches the reference sequence
+				if type_2==4:
+					#compare it to the base at the reference sequence position
+					base=entry1[1]
 				else:
-					i2=entry2[0]
-				if entry1[-1][i2]>0.1:
-					found2bigger=True
+					#otherwise get the base of entry2 (since it has to be 0-3)
+					base=entry2[0]
+				if entry1[2][base]>0.1:
+					moreInfo2=True
 				else:
+					#they can't be compared 
 					return 0
-				pos+=1
-			elif entry2[0]==6:
-				if entry1[0]==4:
-					i1=entry2[1]
+				ref_pos+=1
+			elif type_2 == 6:
+				#if entry1 matches the reference sequence
+				if type_1==4:
+					#compare it to the base at the reference sequence position
+					base=entry2[1]
 				else:
-					i1=entry1[0]
-				if entry2[-1][i1]>0.1:
-					found1bigger=True
+					#otherwise get the base of entry1 (since it has to be 0-3)
+					base=entry1[0]
+				if entry2[2][base]>0.1:
+					moreInfo1=True
 				else:
+					#they can't be compared 
 					return 0
-				pos+=1
+				ref_pos+=1
 			else:
+				#both entry1 and entry2 are some base A,G,T,C 
+				#making them equally as informative and not comparable
 				return 0
-		elif entry1[0]==6:
-			for j in range4:
-				if onlyFindIdentical:
-					if entry2[-1][j]!=entry1[-1][j]:
-						return 0
-				elif entry2[-1][j]>0.1 and entry1[-1][j]<0.1:
-					found1bigger=True
-				elif entry1[-1][j]>0.1 and entry2[-1][j]<0.1:
-					found2bigger=True
-			pos+=1
-		else:
-			if entry1[0]<4:
-				pos+=1
-			else:
-				pos=min(entry1[1],entry2[1])
-		if found1bigger and found2bigger:
+			
+		#we can't say anything if they are both considered to have 'more info'
+		if moreInfo1 and moreInfo2:
 			return 0
-		if pos==lRef:
-			break
-		if entry1[0]<4 or entry1[0]==6:
-			indexEntry1+=1
-			entry1=probVect1[indexEntry1]
-		elif pos==entry1[1]:
-			indexEntry1+=1
-			entry1=probVect1[indexEntry1]
-		if entry2[0]<4 or entry2[0]==6:
-			indexEntry2+=1
-			entry2=probVect2[indexEntry2]
-		elif pos==entry2[1]:
-			indexEntry2+=1
-			entry2=probVect2[indexEntry2]
+		
+		#our if statements are constructed this way because if
+		#the types are 4 or 5, we only want to check the next entry 
+		#if we have reached the end of its last position of the stretch of the 
+		#genome that they represent
+		if type_1 < 4 or type_1 == 6 or ref_pos == entry1[1]:
+			index1+=1
+			entry1 = probVect1[index1]
+		if type_2 < 4 or type_2 == 6 or ref_pos == entry2[1]:
+			index2+=1
+			entry2 = probVect1[index2]
+	
 
-	if found1bigger:
-		if found2bigger:
-			return 0
-		else: 
-			return 1
+	if moreInfo1 and not moreInfo2:
+		return 1
+	elif moreInfo2 and not moreInfo1:
+		return 2
+	elif moreInfo1 and moreInfo2:
+		return 0
 	else:
-		if found2bigger:
-			return 2
-		else:
-			return 1
+		#in this case they are identical
+		return 1
+
+
+
+
+			
 
 
 numMinorsRemoved=[0]
