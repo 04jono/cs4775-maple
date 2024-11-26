@@ -3435,9 +3435,9 @@ def rootVector(probVect, bLen, isFromTip, tree, node):
     """
     def processEntry(entry, bLen, newPos, isFromTip):
         """Process a single entry from probVect."""
-        if entry[0] == 5:
+        if entry[0] == 5: #keeps entry as is
             return entry, entry[1]
-        elif entry[0] == 6:
+        elif entry[0] == 6: #updates likelihoods using bLen and root frequencies
             totBLen = bLen + (entry[2] if len(entry) > 3 else 0)
             newVect = (
                 getPartialVec(6, totBLen, mutMatrices[newPos], 0, vect=entry[-1]) if useRateVariation else
@@ -3458,7 +3458,7 @@ def rootVector(probVect, bLen, isFromTip, tree, node):
             newPos = newPos + 1 if entry[0] < 4 else entry[1]
             return newEntry, newPos
 
-    # Traverse upward through the tree (processing mutations)
+    # upward tree (processing mutations) - collects nodes along upward path
     nodeList = []
     while node is not None:
         nodeList.append(node)
@@ -3473,13 +3473,13 @@ def rootVector(probVect, bLen, isFromTip, tree, node):
         processedEntry, newPos = processEntry(entry, bLen, newPos, isFromTip)
         newProbVect.append(processedEntry)
 
-    # Traverse back down the tree to reapply mutations
+    # Go down (reapply mutations)
     while nodeList:
         node = nodeList.pop()
         if tree.mutations[node]:
             newProbVect = passGenomeListThroughBranch(newProbVect, tree.mutations[node], dirIsUp=False)
 
-    shorten(newProbVect)
+    shorten(newProbVect) #trims newProbVect - look at 'shorten'
     return newProbVect
 
 
