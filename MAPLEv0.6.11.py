@@ -3429,77 +3429,58 @@ def findProbRoot(probVect,node=None,mutations=None,up=None):
 	return logLK
 
 
-#for the root, take lower likelihood genome list probVect, and create an overall likelihood (or upper right or upper left) genome list by multiplying likelihoods by root frequencies.
-def rootVector(probVect,bLen,isFromTip,tree,node):
-	#first representing the genome list wrt the reference genome - this is so to that mutationLists can be accurate.
-	nodeList=[]
-	mutations=tree.mutations
-	up=tree.up
-	if mutations[node]:
-		probVect=passGenomeListThroughBranch(probVect, mutations[node], dirIsUp=True) #, modifyCurrentList=False
-	nodeList.append(node)
-	node=up[node]
-	while node!=None:
-		nodeList.append(node)
-		if mutations[node]:
-			probVect=passGenomeListThroughBranch(probVect, mutations[node], dirIsUp=True) #, modifyCurrentList=True
-		node=up[node]
-	newProbVect=[]
-	newPos=0
-	for entry in probVect:
-		if entry[0]==5:
-			newProbVect.append(entry)
-			newPos=entry[1]
-		elif entry[0]==6:
-			totBLen=bLen
-			if len(entry)>3:
-				totBLen+=entry[2]
-			if totBLen:
-				if useRateVariation:
-					newVect=getPartialVec(6, totBLen, mutMatrices[newPos], 0, vect=entry[-1])
-				else:
-					newVect=getPartialVec(6, totBLen, mutMatrixGlobal, 0, vect=entry[-1])
-				for i in range4:
-					newVect[i]*=rootFreqs[i]
-			else:
-				newVect=[]
-				for i in range4:
-					newVect.append(entry[-1][i]*rootFreqs[i])
-			totSum=sum(newVect)
-			for i in range4:
-				newVect[i]/=totSum
-			newProbVect.append((6,entry[1],newVect))
-			newPos+=1
-		else:
-			if usingErrorRate:
-				flag1 = ((len(entry)>2) and entry[-1]) or isFromTip
-				if len(entry)>3:
-					newProbVect.append((entry[0],entry[1],entry[2]+bLen,0.0,flag1))
-				else:
-					if bLen or flag1:
-						newProbVect.append((entry[0],entry[1],bLen,0.0,flag1))
-					else:
-						newProbVect.append((entry[0],entry[1]))
-			else:
-				if len(entry)==3:
-					newProbVect.append((entry[0],entry[1],entry[2]+bLen,0.0))
-				else:
-					if bLen:
-						newProbVect.append((entry[0],entry[1],bLen,0.0))
-					else:
-						newProbVect.append((entry[0],entry[1]))
-			if entry[0]<4:
-				newPos+=1
-			else:
-				newPos=entry[1]
+def rootVector(probVect, bLen, isFromTip, tree, node):
+    """
+    For the root node, calculate the likelihood genome list by incorporating branch lengths and root frequencies.
+    """
+    def processEntry(entry, bLen, newPos, isFromTip):
+        """Process a single entry from probVect."""
+        if entry[0] == 5:
+            return entry, entry[1]
+        elif entry[0] == 6:
+            totBLen = bLen + (entry[2] if len(entry) > 3 else 0)
+            newVect = (
+                getPartialVec(6, totBLen, mutMatrices[newPos], 0, vect=entry[-1]) if useRateVariation else
+                getPartialVec(6, totBLen, mutMatrixGlobal, 0, vect=entry[-1])
+            ) if totBLen else [
+                freq * value for freq, value in zip(rootFreqs, entry[-1])
+            ]
+            totSum = sum(newVect)
+            newVect = [v / totSum for v in newVect]
+            return (6, entry[1], newVect), newPos + 1
+        else:
+            flag1 = ((len(entry) > 2) and entry[-1]) or isFromTip
+            newEntry = (
+                (entry[0], entry[1], entry[2] + bLen, 0.0, flag1) if len(entry) > 3 else
+                (entry[0], entry[1], bLen, 0.0, flag1) if bLen or flag1 else
+                (entry[0], entry[1])
+            )
+            newPos = newPos + 1 if entry[0] < 4 else entry[1]
+            return newEntry, newPos
 
-	while nodeList:
-		node=nodeList.pop()
-		if mutations[node]:
-			newProbVect=passGenomeListThroughBranch(newProbVect, mutations[node], dirIsUp=False)
-	shorten(newProbVect)
-					
-	return newProbVect
+    # Traverse upward through the tree (processing mutations)
+    nodeList = []
+    while node is not None:
+        nodeList.append(node)
+        if tree.mutations[node]:
+            probVect = passGenomeListThroughBranch(probVect, tree.mutations[node], dirIsUp=True)
+        node = tree.up[node]
+
+    # Go through each entry in probVect
+    newProbVect = []
+    newPos = 0
+    for entry in probVect:
+        processedEntry, newPos = processEntry(entry, bLen, newPos, isFromTip)
+        newProbVect.append(processedEntry)
+
+    # Traverse back down the tree to reapply mutations
+    while nodeList:
+        node = nodeList.pop()
+        if tree.mutations[node]:
+            newProbVect = passGenomeListThroughBranch(newProbVect, tree.mutations[node], dirIsUp=False)
+
+    shorten(newProbVect)
+    return newProbVect
 
 
 #function to add new mutation events in new sample to the pre-exisitng pseudocounts so to improve the estimate of the substitution rates.
