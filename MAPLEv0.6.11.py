@@ -2627,63 +2627,35 @@ def getPartialVec(i12, totLen, mutMatrix, errorRate, vect=None, upNode=False, fl
 	:param upNode: should be True if the nucleotide was observed above the branch.
 	:return: the new likelihood vector for this entry.
 	"""
+	def calculatePartialHelper(length,up,matrix,vector):
+	
+		result = []
+		for i in range(4):
+			temp = 0
+			for j in range(4):
+				if up:
+					temp += matrix[i][j] * vector[j]
+				else:
+					temp += matrix[j][i] * vector[j]
+			temp*=length
+			temp += vector[i]
+
+			#if mutation probabilities dip below 0 then they are not related
+			if temp<0:
+					return [0.25,0.25,0.25,0.25]
+			result.append(temp)
+		return result
+
 	if i12==6:
-		if (not totLen):
-			return list(vect)
-		newVect=[]
-		if upNode:
-			for i in range4:
-				tot=0.0
-				for j in range4:
-					tot+=mutMatrix[j][i]*vect[j]
-				tot*=totLen
-				tot+=vect[i]
-				if tot<0:
-					return [0.25,0.25,0.25,0.25]
-				newVect.append(tot)
-		else:
-			for i in range4:
-				tot=0.0
-				for j in range4:
-					tot+=mutMatrix[i][j]*vect[j]
-				tot*=totLen
-				tot+=vect[i]
-				if tot<0:
-					return [0.25,0.25,0.25,0.25]
-				newVect.append(tot)
-		return newVect
+		newVect=list(vect)
 	elif usingErrorRate and flag:
 		newVect = [errorRate*0.33333] * 4  # without error rate [0.0, 0.0, 0.0, 0.0]
 		newVect[i12] = 1.0 - errorRate  # without error rate: 1.0
-		if (not totLen):
-			return newVect
-		mutatedPartialVec = []
-		for j in range4:
-			tot = 0.0
-			for i in range4:
-				tot += mutMatrix[j][i] * newVect[i]
-			tot *= totLen
-			tot += newVect[j]
-			if tot<0:
-				return [0.25,0.25,0.25,0.25]
-			mutatedPartialVec.append(tot)
-		return mutatedPartialVec
 	else:  # no flag (no error rate)
-		if (not totLen):
-			newVect=[0.0,0.0,0.0,0.0]
-			newVect[i12]+=1.0
-			return newVect
-		newVect = []
-		if upNode:
-			for i in range4:
-				newVect.append(mutMatrix[i12][i] * totLen)
-		else:
-			for i in range4:
-				newVect.append(mutMatrix[i][i12] * totLen)
+		newVect=[0.0,0.0,0.0,0.0]
 		newVect[i12]+=1.0
-		if newVect[i12]<0:
-			return [0.25,0.25,0.25,0.25]
-		return newVect
+		
+	return calculatePartialHelper(totLen,upNode,mutMatrix,newVect)
 
 
 numRefs=[0]
@@ -5059,6 +5031,285 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 			totalFactor=1.0
 
 	return Lkcost+log(totalFactor)
+	# ##### Not covered in Section 1.5 ******************************
+
+	# if not (usingErrorRate and errorRateSiteSpecific): 
+	# 	errorRate=errorRateGlobal
+	# if not useRateVariation:
+	# 	mutMatrix=mutMatrixGlobal
+
+	# ##### Not covered in Section 1.5 ******************************
+
+	# ref_pos = 0
+	# parentIndex = 0
+	# childIndex = 0
+	# probability = 1
+	# parentEntry=probVectP[parentIndex] #parent
+	# childEntry=probVectC[childIndex] #child
+
+	# #did not change this part 
+	# Lkcost=bLen*globalTotRate
+	# if usingErrorRate and isTipC:
+	# 	Lkcost+=totError
+	# # did not change this 
+
+
+	# #keep iterating until we reach the end of the reference
+	# while ref_pos < lRef:
+
+	# 	#at least one of the entries is N so they do not contribute to likelihood score
+	# 	if parentEntry[0]==5 or childEntry[0]==5:
+	# 		if parentEntry[0]==5 and childEntry[0]==5:
+	# 			if parentEntry[1] < childEntry[1]:
+	# 				ref_pos = parentEntry[1]
+	# 				parentIndex+=1
+	# 				parentEntry = probVectP[parentIndex]
+	# 			else:
+	# 				ref_pos = childEntry[1]
+	# 				childIndex+=1
+	# 				childEntry = probVectC[childIndex]
+	# 		else:
+	# 			ref_pos +=1 
+	# 			parentIndex+=1
+	# 			parentEntry=probVectP[parentIndex]
+	# 			childIndex+=1
+	# 			childEntry=probVectC[childIndex]
+	# 	#when they are the same entry but not type O there is no contribution
+	# 	#to the likelihood
+	# 	elif parentEntry[0]==childEntry[0] and parentEntry[0]!=6:
+
+	# 		#they are both of type R
+	# 		if entry2[0]==4:
+	# 			if parentEntry[1] < childEntry[1]:
+	# 				ref_pos = parentEntry[1]
+	# 				parentIndex+=1
+	# 				parentEntry = probVectP[parentIndex]
+	# 			else:
+	# 				ref_pos = childEntry[1]
+	# 				childIndex+=1
+	# 				childEntry = probVectC[childIndex]
+	# 		else:
+	# 			ref_pos +=1 
+	# 			parentIndex+=1
+	# 			parentEntry=probVectP[parentIndex]
+	# 			childIndex+=1
+	# 			childEntry=probVectC[childIndex]
+	# 	elif parentEntry[0]==childEntry[0] and parentEntry[0]==6:
+	# 		if useRateVariation:
+	# 				mutMatrix=mutMatrices[pos]
+	# 		tot=0.0
+
+	# 		#if we want to factor in the branch length we get the partial
+	# 		#vector to calculate the probabilities
+	# 		if bLen:
+	# 			lenToAdd = bLen
+	# 			lenToAdd+=parentEntry[2]
+	# 			lenToAdd+=childEntry[2]
+	# 			partialVecLen=getPartialVec(6, lenToAdd, mutMatrix, None, vect=childEntry[-1])
+	# 			for j in range4:
+	# 				tot+=parentEntry[-1][j]*partialVecLen[j]
+	# 		else:
+	# 				for j in range4:
+	# 					tot+=parentEntry[-1][j]*childEntry[-1][j]
+	# 		probability*=tot
+		
+	# 	else:
+	# 		#the child and parent are diff types
+
+	# 		### Did not reimplement these calculations
+	# 		contribLength=bLen
+	# 		if entry1[0]<5:
+	# 			if len(entry1)==3+usingErrorRate:
+	# 				contribLength+=entry1[2]
+	# 			elif len(entry1)==4+usingErrorRate:
+	# 				contribLength+=entry1[3]
+	# 		elif len(entry1)==4:
+	# 			contribLength+=entry1[2]
+	# 		if entry2[0]<5:
+	# 			if len(entry2)==3+usingErrorRate:
+	# 				contribLength+=entry2[2]
+	# 		elif len(entry2)==4:
+	# 			contribLength+=entry2[2]
+	# 		### Did not reimplement these calculations
+
+	# 		#if the parent type is R
+	# 		if parentEntry[0]==4: # case entry1 is R	
+	# 			#the child entry is of type "O"
+	# 			if entry2[0]==6:
+	# 				if useRateVariation:
+	# 					mutMatrix=mutMatrices[pos]
+	# 				i1=entry2[1]
+	# 				if entry2[-1][i1]>0.02:
+	# 					totalFactor*=entry2[-1][i1]
+	# 				else:
+	# 					if len(entry1)==4+usingErrorRate:
+	# 						flag1 = (usingErrorRate and (len(entry1)>2) and entry1[-1] )
+	# 						tot=0.0
+	# 						if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
+	# 						tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=entry2[-1])
+	# 						tot2=getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
+	# 						for i in range4:
+	# 							tot+=tot3[i]*tot2[i]*rootFreqs[i]
+	# 						tot/=rootFreqs[i1]
+	# 					else:
+	# 						if contribLength:
+	# 							tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=entry2[-1])
+	# 							tot=tot3[i1]
+	# 						else:
+	# 							tot=entry2[-1][i1]
+	# 					totalFactor*=tot
+	# 				pos+=1
+	# 				if pos==lRef:
+	# 					break
+	# 				indexEntry2+=1
+	# 				entry2=probVectC[indexEntry2]
+
+	# 			else: #entry1 is R and entry2 is a different but single nucleotide
+	# 				flag2 = (usingErrorRate and (isTipC or (len(entry2)>2) and entry2[-1] ))
+	# 				if useRateVariation:
+	# 					mutMatrix=mutMatrices[pos]
+	# 				if len(entry1)==4+usingErrorRate:
+	# 					flag1 = (usingErrorRate and (len(entry1)>2) and entry1[-1] )
+	# 					i1=entry2[1]
+	# 					i2=entry2[0]
+	# 					if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
+	# 					tot3=getPartialVec(i2, contribLength, mutMatrix, errorRate, flag=flag2)
+	# 					tot2=getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
+	# 					tot=0.0
+	# 					for i in range4:
+	# 						tot+=tot3[i]*tot2[i]*rootFreqs[i]
+	# 					totalFactor*=tot/rootFreqs[i1]
+	# 				else:
+	# 					if flag2:
+	# 						if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
+	# 						totalFactor*=min(0.25,mutMatrix[entry2[1]][entry2[0]]*contribLength)+errorRate*0.33333
+	# 					else:
+	# 						if contribLength:
+	# 							totalFactor*=min(0.25,mutMatrix[entry2[1]][entry2[0]]*contribLength)
+	# 						else:
+	# 							return float("-inf")
+	# 				pos+=1
+	# 				if pos==lRef:
+	# 					break
+	# 				indexEntry2+=1
+	# 				entry2=probVectC[indexEntry2]
+	# 			if entry1[1]==pos:
+	# 				indexEntry1+=1
+	# 				entry1=probVectP[indexEntry1]
+
+	# 		# entry1 is of type "O"
+	# 		elif entry1[0]==6:
+	# 			if useRateVariation:
+	# 				mutMatrix=mutMatrices[pos]
+	# 			if entry2[0]==6:
+	# 				tot=0.0
+	# 				if contribLength:
+	# 					tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=entry2[-1])
+	# 					for j in range4:
+	# 						tot+=entry1[-1][j]*tot3[j]
+	# 				else:
+	# 					for j in range4:
+	# 						tot+=entry1[-1][j]*entry2[-1][j]
+	# 				totalFactor*=tot
+	# 			else: #entry1 is "O" and entry2 is a nucleotide
+	# 				if entry2[0]==4:
+	# 					i2=entry1[1]
+	# 				else:
+	# 					i2=entry2[0]
+	# 				if entry1[-1][i2]>0.02:
+	# 					totalFactor*=entry1[-1][i2]
+	# 				else:
+	# 					if (usingErrorRate and (isTipC or (len(entry2)>2) and entry2[-1] )):
+	# 						if errorRateSiteSpecific: errorRate = errorRates[pos]
+	# 						tot3=getPartialVec(i2, contribLength, mutMatrix, errorRate, flag=True)
+	# 					else:
+	# 						tot3=getPartialVec(i2, contribLength, mutMatrix, None, flag=False)
+	# 					tot=0.0
+	# 					for j in range4:
+	# 						tot+=entry1[-1][j]*tot3[j]
+	# 					totalFactor*=tot
+	# 			pos+=1
+	# 			if pos==lRef:
+	# 				break
+	# 			indexEntry1+=1
+	# 			entry1=probVectP[indexEntry1]
+	# 			if entry2[0]!=4 or entry2[1]==pos:
+	# 				indexEntry2+=1
+	# 				entry2=probVectC[indexEntry2]
+
+	# 		else: #entry1 is a non-ref nuc
+	# 			if entry2[0]!=entry1[0]:
+	# 				flag1 = (usingErrorRate and (len(entry1)>2) and entry1[-1] )
+	# 				if useRateVariation:
+	# 					mutMatrix=mutMatrices[pos]
+
+	# 				i1=entry1[0]
+	# 				if entry2[0]<5: #entry2 is a nucleotide
+	# 					if entry2[0]==4:
+	# 						i2=entry1[1]
+	# 					else:
+	# 						i2=entry2[0]
+	# 					flag2 = (usingErrorRate and (isTipC or (len(entry2)>2) and entry2[-1] ))
+	# 					if len(entry1)==4+usingErrorRate:
+	# 						if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
+	# 						tot3=getPartialVec(i2, contribLength, mutMatrix, errorRate, flag=flag2)
+	# 						tot2=getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
+	# 						tot=0.0
+	# 						for j in range4:
+	# 							tot+=rootFreqs[j]*tot3[j]*tot2[j]
+	# 						totalFactor*=tot/rootFreqs[i1]
+	# 					else:
+	# 						if flag1 or flag2:
+	# 							if errorRateSiteSpecific: errorRate = errorRates[pos]
+	# 							totalFactor*=(min(0.25,mutMatrix[i1][i2]*contribLength)+(flag1 + flag2)*0.33333*errorRate)
+	# 						else:
+	# 							if contribLength:
+	# 								totalFactor*=min(0.25,mutMatrix[i1][i2]*contribLength)
+	# 							else:
+	# 								return float("-inf")
+
+	# 				else: #entry1 is a nucleotide and entry2 is of type "O"
+	# 					if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
+	# 					if entry2[-1][i1]>0.02:
+	# 						totalFactor*=entry2[-1][i1]
+	# 					else:
+	# 						if len(entry1)==4+usingErrorRate:
+	# 							tot2=getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
+	# 							tot3=getPartialVec(6, contribLength, mutMatrix, errorRate, vect=entry2[-1])
+	# 							tot=0.0
+	# 							for i in range4:
+	# 								tot+=tot2[i]*tot3[i]*rootFreqs[i]
+	# 							totalFactor*=(tot/rootFreqs[i1])
+	# 						else:
+	# 							if contribLength:
+	# 								tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=entry2[-1])
+	# 								totalFactor*=tot3[i1]
+	# 							else:
+	# 								totalFactor*=entry2[-1][i1]
+
+	# 			pos+=1
+	# 			if pos==lRef:
+	# 				break
+	# 			indexEntry1+=1
+	# 			entry1=probVectP[indexEntry1]
+	# 			if entry2[0]!=4 or entry2[1]==pos:
+	# 				indexEntry2+=1
+	# 				entry2=probVectC[indexEntry2]
+
+	# 	if totalFactor<=minimumCarryOver:
+	# 		try:
+	# 			if totalFactor<sys.float_info.min:
+	# 				if bLen:
+	# 					print("In appendProbNode() strangely small probability")
+	# 				return float("-inf")
+	# 		except:
+	# 			print("In appendProbNode() value error")
+	# 			print(totalFactor)
+	# 			return float("-inf")
+	# 		Lkcost+=log(totalFactor)
+	# 		totalFactor=1.0
+
+	# return Lkcost+log(totalFactor)
 
 
 #number of samples that could have been placed as major of another sample but weren't due to sample placement order
