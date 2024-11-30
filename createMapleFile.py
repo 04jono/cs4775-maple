@@ -4,179 +4,170 @@ from os import path
 import argparse
 import time
 
-#©EMBL-European Bioinformatics Institues, 2021
+# Translate a fasta alignment into a MAPLE format file.
 
-#Translate fasta alignment into a MAPLE format file.
-#Example run command line: python3 createDiffsFile.py --path /pathToFolder/ --reference EPI_ISL_402124_lowercase.fasta --fasta 2021-03-31_unmasked.fa --output 2021-03-31_unmasked_differences.txt
+class Sequence:
+    '''A sequence parsed from a FASTA file.
 
-#TODO use consensus sequence when no reference is provided.
-#TODO create new MAPLE format output with reference first.
-
-parser = argparse.ArgumentParser(description='Translate fasta alignment into a MAPLE file.')
-parser.add_argument('--path',default="", help='path where to find and write files.')
-parser.add_argument('--reference',default="", help='name of the reference sequence file within the --path. By default creates a new reference from the input alignment consensus.')
-parser.add_argument("--fasta",default="2021-03-31_unmasked.fa", help="name of the input fasta alignment file.")
-parser.add_argument("--output",default="2021-03-31_unmasked_differences.txt", help="name of the output diff file.")
-parser.add_argument("--overwrite", help="Overwrite previous MAPLE file with the same output name if already present.", action="store_true")
-args = parser.parse_args()
-
-pathSimu=args.path
-reference=args.reference
-fasta=args.fasta
-output=args.output
-overwrite=args.overwrite
-
-if not os.path.isdir(pathSimu):
-	print("ERROR path "+pathSimu+" does not exist, quitting createMapleFile.py . Use option --path to specify a valid path for input and output files location.")
-	exit()
-if not os.path.isfile(pathSimu+fasta):
-	print("ERROR input file in fasta format "+pathSimu+fasta+" not found, quitting createMapleFile.py . Use option --fasta to specify a valid input fasta file name to be found within the folder spcefified by option --path .")
-	exit()
-if reference!="" and ( not os.path.isfile(pathSimu+reference)):
-	print("ERROR input reference fasta file "+pathSimu+reference+" not found, quitting createMapleFile.py . You can skip option --reference and this script will use the alignmnt consensus as a reference instead .")
-	exit()
-if os.path.isfile(pathSimu+output)  and (not overwrite):
-	print("ERROR file "+pathSimu+output+" already exists, quitting createMapleFile.py . Use option --overwrite if you want to overwirte files previously created.")
-	exit()
+    Attributes:
+    description: str
+        The description of the genome.
+    sequence: str
+        The genome sequence.
+    '''
+    def __init__(self, description: str, sequence: str):
+        self.name = description
+        self.sequence = sequence
 
 
+def parse_fasta(file_path: str) -> list:
+    '''Parse a fasta file and return a list of Sequence objects. '''
+    sequences = []
+    current_label = None
+    current_sequence = ""
+    with open(file_path, 'r') as file:
+        for line in file:
+            line = line.strip()
+            # Check if the line is a label
+            if line.startswith('>'):
+                # Flush previous label
+                if current_label is not None:
+                    sequences.append(Sequence(current_label, current_sequence))
 
-alleles={"A":0,"C":1,"G":2,"T":3}
-allelesList=["A","C","G","T"]
-allelesLow={"a":0,"c":1,"g":2,"t":3}
-allelesListLow=["a","c","g","t"]
-ambiguities={"y":[0.0,1.0,0.0,1.0],"r":[1.0,0.0,1.0,0.0],"w":[1.0,0.0,0.0,1.0],"s":[0.0,1.0,1.0,0.0],"k":[0.0,0.0,1.0,1.0],"m":[1.0,1.0,0.0,0.0],"d":[1.0,0.0,1.0,1.0],"v":[1.0,1.0,1.0,0.0],"h":[1.0,1.0,0.0,1.0],"b":[0.0,1.0,1.0,1.0]}
+                # Start a new label and reset sequence
+                current_label = line[1:]  # Remove the '>'
+                current_sequence = ""
+            else:
+                # Append the sequence lines
+                current_sequence += line
 
-#collect reference
-def collectReference(fileName):
-	file=open(fileName)
-	line=file.readline()
-	ref=""
-	while line!="":
-		line=file.readline()
-		ref+=line.replace("\n","")
-	lRef=len(ref)
-	print("Ref genome length: "+str(lRef))
-	file.close()
-	ref=ref.lower()
-	return ref
+        # Save the last label and sequence
+        if current_label is not None:
+            sequences.append(Sequence(current_label, current_sequence))
+        
+        return sequences
 
-#extract consensus sequence from an alignment
-def extractConsensus(fileName):
-	file=open(fileName)
-	line=file.readline()
-	counts=[]
-	while line!="":
-		seq=""
-		name=line.replace(">","").replace("\n","")
-		line=file.readline()
-		while line!="" and line!="\n" and line[0]!=">":
-			seq+=line.replace("\n","").lower()
-			line=file.readline()
-		if not counts:
-			for i in range(len(seq)):
-				counts.append([0,0,0,0])
-		if len(seq)!=len(counts):
-			print("ERROR sequence of sample "+name+" has length "+str(len(seq))+" instead of "+str(len(counts))+" of the first sequence in the file. Exiting createMapleFile.py .")
-			exit()
-		for i in range(len(seq)):
-			if seq[i] in allelesListLow:
-				counts[i][allelesLow[seq[i]]]+=1
-		while line=="\n":
-			line=file.readline()
-	consensus=""
-	for i in range(len(counts)):
-		maxI=0
-		maxV=0
-		for j in range(4):
-			if counts[i][j]>maxV:
-				maxI=j
-				maxV=counts[i][j]
-		if maxV>0:
-			consensus+=allelesListLow[maxI]
-		else:
-			print("WARNING no nucleotide observed at position "+str(i+1)+" of the alignment. Consensus is assigned as n, which can create problems down the line if more sequence will be analysed with the same reference." )
-			consensus+="n"
-	return consensus
+def generate_consensus(sequences: list) -> str:
+    '''Generate a consensus sequence from a list of sequences. '''
+    # Get the length of the sequences
+    seq_length = len(sequences[0].sequence)
 
-if reference!="":
-	ref = collectReference(pathSimu+reference)
-else:
-	ref = extractConsensus(pathSimu+fasta)
-lRef=len(ref)
+    for s in sequences:
+        if len(s.sequence) != seq_length:
+            raise ValueError("All sequences must be the same length.")
+    
+    consensus = ""
+    for i in range(seq_length):
+        # Get the nucleotides at position i
+        nucleotides = [s.sequence[i] for s in sequences]
+        # Count the number of each nucleotide
+        counts = {n: nucleotides.count(n) for n in 'ACGT'}
+        # Get the most common nucleotide
+        consensus += max(counts, key=counts.get)
 
+    return consensus
 
-start = time.time()
-#collect alignment and translate into diff file
-fileI=open(pathSimu+fasta)
-fileO=open(pathSimu+output,"w")
-fileO.write(">reference\n"+ref+"\n")
-line=fileI.readline()
-nSeqs=0
-while line!="":
-	while line=="\n":
-		line=fileI.readline()
-	if line=="":
-		break
-	nSeqs+=1
-	seq=""
-	name=line.replace(">","").replace("\n","")
-	fileO.write(line)
-	line=fileI.readline()
-	while line!="" and line!="\n" and line[0]!=">":
-		seq+=line.replace("\n","")
-		line=fileI.readline()
-	if len(seq)!=lRef:
-		print("Seq "+name+" has length "+str(len(seq))+" while reference is "+str(lRef))
-		exit()
-	# state 0=ref; 1=N; 2=-; 
-	state=0
-	seqList=[]
-	length=0
-	seq=seq.lower()
-	for i in range(lRef):
-		if state==1:
-			if seq[i]=="n":
-				length+=1
-			else:
-				seqList.append(("n",i+1-length,length))
-				length=0
-				state=0
-		elif state==2:
-			if seq[i]=="-":
-				length+=1
-			else:
-				seqList.append(("-",i+1-length,length))
-				length=0
-				state=0
-		if seq[i]=="n" and state!=1:
-			length=1
-			state=1
-		elif seq[i]=="-" and state!=2:
-			length=1
-			state=2
-		elif seq[i]!=ref[i] and seq[i]!="-" and seq[i]!="n":
-			seqList.append((seq[i],i+1))
-	if state==1:
-			seqList.append(("n",lRef+1-length,length))
-	elif state==2:
-			seqList.append(("-",lRef+1-length,length))
-	for m in seqList:
-		if len(m)==2:
-			fileO.write(m[0]+"\t"+str(m[1])+"\n")
-		else:
-			fileO.write(m[0]+"\t"+str(m[1])+"\t"+str(m[2])+"\n")
-	if (nSeqs%10000)==0:
-		print("Processes "+str(nSeqs)+" sequences")
-fileI.close()
-fileO.close()
+if __name__ == '__main__':
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Translate a fasta alignment into a MAPLE format file.')
+    parser.add_argument('--input', type=str, help='The input fasta file.')
+    parser.add_argument('--reference', type=str, help='The reference fasta file.')
+    parser.add_argument("--output", type=str, help="The output MAPLE file.")
+    args = parser.parse_args()
 
-time2 = time.time() - start
-print("Time to convert alignment file: "+str(time2))
-print(str(nSeqs)+" sequences converted.")
+    if not path.exists(args.input):
+        print(f"ERROR: Input file {args.input} not found.")
+        sys.exit(1)
+    
+    if args.reference:
+        if not path.exists(args.reference):
+            print(f"ERROR: Reference file {args.reference} not found.")
+            sys.exit(1)
+    else:
+        print("No reference file provided. Consensus sequence will be used as reference.")
+    
+    reference = None
+    sequences = parse_fasta(args.input)
+    if args.reference:
+        reference = parse_fasta(args.reference)[0].sequence
+    else:
+        reference = generate_consensus(sequences)
 
-exit()
+    # Check if the reference sequence length matches the input sequences
+    for s in sequences:
+        if len(reference) != len(s.sequence):
+            print(f"ERROR: Reference sequence length does not match the input sequence {s.name}.")
+            sys.exit(1)
 
+    # Write the output MAPLE file
+    with open(args.output, 'w') as file:
+        file.write(f">reference\n{reference.lower()}\n")
 
+        for s in sequences:
+            file.write(f">{s.name}\n")
+            diff = ""
+            for i in range(len(s.sequence)):
+                if s.sequence[i] == 'n' or s.sequence[i] == '-':
+                    diff += s.sequence[i]
+                elif s.sequence[i] != reference[i]:
+                    diff += s.sequence[i]
+                else:
+                    diff += "0"
+            
+            
+            last_n_or_gap = None
+            last_index = -1
+            for i in range(len(diff)):
+                if diff[i] == 'n':
+                    if last_n_or_gap != 'n':
+                        # Flush the last gap
+                        if last_n_or_gap == '-':
+                            file.write(f"-\t{last_index}\t{i - last_index + 1}\n")
+                        last_n_or_gap = 'n'
+                        last_index = i + 1
+                    else:
+                        continue
+                elif diff[i] == '-':
+                    if last_n_or_gap != '-':
+                        # Flush the last n
+                        if last_n_or_gap == 'n':
+                            file.write(f"n\t{last_index}\t{i - last_index + 1}\n")
+                        last_n_or_gap = '-'
+                        last_index = i + 1
+                    else:
+                        continue
+                elif diff[i] != '0':
+                    # Flush the last gap or n
+                    if last_n_or_gap == 'n':
+                        file.write(f"n\t{last_index}\t{i - last_index + 1}\n")
+                    elif last_n_or_gap == '-':
+                        file.write(f"n\t{last_index}\t{i - last_index + 1}\n")
 
+                    last_n_or_gap = None
+                    last_index = -1
 
+                    file.write(f"{diff[i].lower()}\t{i + 1}\n")
+                else:
+                    # Flush the last gap or n
+                    if last_n_or_gap == 'n':
+                        file.write(f"n\t{last_index}\t{i - last_index + 1}\n")
+                    elif last_n_or_gap == '-':
+                        file.write(f"n\t{last_index}\t{i - last_index + 1}\n")
+
+                    last_n_or_gap = None
+                    last_index = -1
+                
+            # Flush the last gap or n
+            if last_n_or_gap == 'n':
+                file.write(f"n {last_index} {i - last_index + 1}\n")
+            elif last_n_or_gap == '-':
+                file.write(f"n {last_index} {i - last_index + 1}\n")
+
+            last_n_or_gap = None
+            last_index = -1
+            
+
+                    
+    
+
+        
