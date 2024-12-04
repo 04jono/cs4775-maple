@@ -43,7 +43,7 @@ def parse_fasta(file_path: str) -> list:
 
         # Save the last label and sequence
         if current_label is not None:
-            sequences.append(Sequence(current_label, current_sequence))
+            sequences.append(Sequence(current_label, current_sequence.lower()))
         
         return sequences
 
@@ -61,10 +61,11 @@ def generate_consensus(sequences: list) -> str:
         # Get the nucleotides at position i
         nucleotides = [s.sequence[i] for s in sequences]
         # Count the number of each nucleotide
-        counts = {n: nucleotides.count(n) for n in 'ACGT'}
+        counts = {n: nucleotides.count(n) for n in 'acgt-n'}
         # Get the most common nucleotide
         consensus += max(counts, key=counts.get)
-
+    
+    print(f"Consensus sequence: {consensus}")
     return consensus
 
 if __name__ == '__main__':
@@ -74,6 +75,9 @@ if __name__ == '__main__':
     parser.add_argument('--reference', type=str, help='The reference fasta file.')
     parser.add_argument("--output", type=str, help="The output MAPLE file.")
     args = parser.parse_args()
+
+    import time
+    start_time = time.time()
 
     if not path.exists(args.input):
         print(f"ERROR: Input file {args.input} not found.")
@@ -92,13 +96,11 @@ if __name__ == '__main__':
         reference = parse_fasta(args.reference)[0].sequence
     else:
         reference = generate_consensus(sequences)
-
     # Check if the reference sequence length matches the input sequences
     for s in sequences:
         if len(reference) != len(s.sequence):
             print(f"ERROR: Reference sequence length does not match the input sequence {s.name}.")
             sys.exit(1)
-
     # Write the output MAPLE file
     with open(args.output, 'w') as file:
         file.write(f">reference\n{reference.lower()}\n")
@@ -165,6 +167,9 @@ if __name__ == '__main__':
 
             last_n_or_gap = None
             last_index = -1
+    
+    print("Time - %s seconds" % (time.time() - start_time))
+
             
 
                     
