@@ -3405,6 +3405,7 @@ def rootVector(probVect, bLen, isFromTip, tree, node):
     """
     For the root node, calculate the likelihood genome list by incorporating branch lengths and root frequencies.
     """
+		
     def processEntry(entry, bLen, newPos, isFromTip):
         """Process a single entry from probVect."""
         if entry[0] == 5: #keeps entry as is
@@ -4195,113 +4196,199 @@ def areVectorsDifferentDebugging(probVect1,probVect2,threshold=0.00001):
 #returns 0 when the 2 sequences are not comparable, otherwise returns 1 if the first is more informative or if they are identical, and 2 otherwise.
 #if onlyFindIdentical (the case sequencing errors are considered) returns 1 if sequences are identical, and 0 otherwise.
 def isMinorSequence(probVect1,probVect2,onlyFindIdentical=False):
-	index1 = 0
-	index2 = 0
-	entry1 = probVect1[index1]
-	entry2 = probVect2[index2]
-	moreInfo1 = False
-	moreInfo2 = False
-	ref_pos = 0
-	while ref_pos < lRef:
-		type_1 = entry1[0]
-		type_2 = entry2[0]
-		
-		if entry1 == entry2:
-			#if it just a regular base incremement the reference_position by 1
-			if type_1 < 4:
-				ref_pos+=1
-			elif type_1 == 5 or type_1 == 4:
-				ref_pos = min(entry1[1],entry2[2])
-			else:
-				#the type is 6
-				for i in range(4):
-					if onlyFindIdentical:
-						#we are only meant to find identical sequences and we found an
-						#inconsistency so we can return 0 immediately
-						if entry1[2][i]!=entry2[2][i]:
-							return 0
-						if entry1[2][i] < 0.1 and entry2[2][i] > 0.1:
-							moreInfo1 = True
-						if entry1[2][i] > 0.1 and entry2[2][i] < 0.1:
-							moreInfo2 = True
-				ref_pos+=1
-		else:
+	indexEntry1, indexEntry2, pos = 0, 0, 0
+	entry1=probVect1[indexEntry1]
+	entry2=probVect2[indexEntry2]
+	found1bigger=False
+	found2bigger=False
+	while True:
+		if entry1[0]!=entry2[0]:
 			if onlyFindIdentical:
-				#in this case we are only meant to find identical sequences
-				#but we have already found an inconsistency
 				return 0
-			if type_1 == 5:
-				if type_2 == 4:
-					ref_pos = min(entry1[1],entry2[1])
+			elif entry1[0]==5:
+				if entry2[0]==4:
+					pos=min(entry1[1],entry2[1])
 				else:
-					ref_pos+=1
-				#2 holds more info in this case as sequence of type 5 has no info
-				moreInfo2 = True
-			elif type_2 == 5:
-				if type_1 == 4:
-					ref_pos = min(entry1[1],entry2[1])
+					pos+=1
+				found2bigger=True
+			elif entry2[0]==5:
+				if entry1[0]==4:
+					pos=min(entry1[1],entry2[1])
 				else:
-					ref_pos+=1
-				#1 holds more info in this case as sequence of type 5 has no info
-				moreInfo1 = True
-			elif type_1 == 6:
-				#if entry2 matches the reference sequence
-				if type_2==4:
-					#compare it to the base at the reference sequence position
-					base=entry1[1]
+					pos+=1
+				found1bigger=True
+			elif entry1[0]==6:
+				if entry2[0]==4:
+					i2=entry1[1]
 				else:
-					#otherwise get the base of entry2 (since it has to be 0-3)
-					base=entry2[0]
-				if entry1[2][base]>0.1:
-					moreInfo2=True
+					i2=entry2[0]
+				if entry1[-1][i2]>0.1:
+					found2bigger=True
 				else:
-					#they can't be compared 
 					return 0
-				ref_pos+=1
-			elif type_2 == 6:
-				#if entry1 matches the reference sequence
-				if type_1==4:
-					#compare it to the base at the reference sequence position
-					base=entry2[1]
+				pos+=1
+			elif entry2[0]==6:
+				if entry1[0]==4:
+					i1=entry2[1]
 				else:
-					#otherwise get the base of entry1 (since it has to be 0-3)
-					base=entry1[0]
-				if entry2[2][base]>0.1:
-					moreInfo1=True
+					i1=entry1[0]
+				if entry2[-1][i1]>0.1:
+					found1bigger=True
 				else:
-					#they can't be compared 
 					return 0
-				ref_pos+=1
+				pos+=1
 			else:
-				#both entry1 and entry2 are some base A,G,T,C 
-				#making them equally as informative and not comparable
 				return 0
-			
-		#we can't say anything if they are both considered to have 'more info'
-		if moreInfo1 and moreInfo2:
+		elif entry1[0]==6:
+			for j in range4:
+				if onlyFindIdentical:
+					if entry2[-1][j]!=entry1[-1][j]:
+						return 0
+				elif entry2[-1][j]>0.1 and entry1[-1][j]<0.1:
+					found1bigger=True
+				elif entry1[-1][j]>0.1 and entry2[-1][j]<0.1:
+					found2bigger=True
+			pos+=1
+		else:
+			if entry1[0]<4:
+				pos+=1
+			else:
+				pos=min(entry1[1],entry2[1])
+		if found1bigger and found2bigger:
 			return 0
+		if pos==lRef:
+			break
+		if entry1[0]<4 or entry1[0]==6:
+			indexEntry1+=1
+			entry1=probVect1[indexEntry1]
+		elif pos==entry1[1]:
+			indexEntry1+=1
+			entry1=probVect1[indexEntry1]
+		if entry2[0]<4 or entry2[0]==6:
+			indexEntry2+=1
+			entry2=probVect2[indexEntry2]
+		elif pos==entry2[1]:
+			indexEntry2+=1
+			entry2=probVect2[indexEntry2]
+
+	if found1bigger:
+		if found2bigger:
+			return 0
+		else: 
+			return 1
+	else:
+		if found2bigger:
+			return 2
+		else:
+			return 1
+
+	# index1 = 0
+	# index2 = 0
+	# entry1 = probVect1[index1]
+	# entry2 = probVect2[index2]
+	# moreInfo1 = False
+	# moreInfo2 = False
+	# ref_pos = 0
+	# while ref_pos < lRef:
+	# 	type_1 = entry1[0]
+	# 	type_2 = entry2[0]
 		
-		#our if statements are constructed this way because if
-		#the types are 4 or 5, we only want to check the next entry 
-		#if we have reached the end of its last position of the stretch of the 
-		#genome that they represent
-		if type_1 < 4 or type_1 == 6 or ref_pos == entry1[1]:
-			index1+=1
-			entry1 = probVect1[index1]
-		if type_2 < 4 or type_2 == 6 or ref_pos == entry2[1]:
-			index2+=1
-			entry2 = probVect1[index2]
+	# 	if entry1 == entry2:
+	# 		#if it just a regular base incremement the reference_position by 1
+	# 		if type_1 < 4:
+	# 			ref_pos+=1
+	# 		elif type_1 == 5 or type_1 == 4:
+	# 			ref_pos = min(entry1[1],entry2[2])
+	# 		else:
+	# 			#the type is 6
+	# 			for i in range(4):
+	# 				if onlyFindIdentical:
+	# 					#we are only meant to find identical sequences and we found an
+	# 					#inconsistency so we can return 0 immediately
+	# 					if entry1[2][i]!=entry2[2][i]:
+	# 						return 0
+	# 					if entry1[2][i] < 0.1 and entry2[2][i] > 0.1:
+	# 						moreInfo1 = True
+	# 					if entry1[2][i] > 0.1 and entry2[2][i] < 0.1:
+	# 						moreInfo2 = True
+	# 			ref_pos+=1
+	# 	else:
+	# 		if onlyFindIdentical:
+	# 			#in this case we are only meant to find identical sequences
+	# 			#but we have already found an inconsistency
+	# 			return 0
+	# 		if type_1 == 5:
+	# 			if type_2 == 4:
+	# 				ref_pos = min(entry1[1],entry2[1])
+	# 			else:
+	# 				ref_pos+=1
+	# 			#2 holds more info in this case as sequence of type 5 has no info
+	# 			moreInfo2 = True
+	# 		elif type_2 == 5:
+	# 			if type_1 == 4:
+	# 				ref_pos = min(entry1[1],entry2[1])
+	# 			else:
+	# 				ref_pos+=1
+	# 			#1 holds more info in this case as sequence of type 5 has no info
+	# 			moreInfo1 = True
+	# 		elif type_1 == 6:
+	# 			#if entry2 matches the reference sequence
+	# 			if type_2==4:
+	# 				#compare it to the base at the reference sequence position
+	# 				base=entry1[1]
+	# 			else:
+	# 				#otherwise get the base of entry2 (since it has to be 0-3)
+	# 				base=entry2[0]
+	# 			if entry1[2][base]>0.1:
+	# 				moreInfo2=True
+	# 			else:
+	# 				#they can't be compared 
+	# 				return 0
+	# 			ref_pos+=1
+	# 		elif type_2 == 6:
+	# 			#if entry1 matches the reference sequence
+	# 			if type_1==4:
+	# 				#compare it to the base at the reference sequence position
+	# 				base=entry2[1]
+	# 			else:
+	# 				#otherwise get the base of entry1 (since it has to be 0-3)
+	# 				base=entry1[0]
+	# 			if entry2[2][base]>0.1:
+	# 				moreInfo1=True
+	# 			else:
+	# 				#they can't be compared 
+	# 				return 0
+	# 			ref_pos+=1
+	# 		else:
+	# 			#both entry1 and entry2 are some base A,G,T,C 
+	# 			#making them equally as informative and not comparable
+	# 			return 0
+			
+	# 	#we can't say anything if they are both considered to have 'more info'
+	# 	if moreInfo1 and moreInfo2:
+	# 		return 0
+		
+	# 	#our if statements are constructed this way because if
+	# 	#the types are 4 or 5, we only want to check the next entry 
+	# 	#if we have reached the end of its last position of the stretch of the 
+	# 	#genome that they represent
+	# 	if type_1 < 4 or type_1 == 6 or ref_pos == entry1[1]:
+	# 		index1+=1
+	# 		entry1 = probVect1[index1]
+	# 	if type_2 < 4 or type_2 == 6 or ref_pos == entry2[1]:
+	# 		index2+=1
+	# 		entry2 = probVect1[index2]
 	
 
-	if moreInfo1 and not moreInfo2:
-		return 1
-	elif moreInfo2 and not moreInfo1:
-		return 2
-	elif moreInfo1 and moreInfo2:
-		return 0
-	else:
-		#in this case they are identical
-		return 1
+	# if moreInfo1 and not moreInfo2:
+	# 	return 1
+	# elif moreInfo2 and not moreInfo1:
+	# 	return 2
+	# elif moreInfo1 and moreInfo2:
+	# 	return 0
+	# else:
+	# 	#in this case they are identical
+	# 	return 1
 
 
 
@@ -5031,7 +5118,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 			totalFactor=1.0
 
 	return Lkcost+log(totalFactor)
-	# ##### Not covered in Section 1.5 ******************************
+	#### Not covered in Section 1.5 ******************************
 
 	# if not (usingErrorRate and errorRateSiteSpecific): 
 	# 	errorRate=errorRateGlobal
@@ -5043,7 +5130,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 	# ref_pos = 0
 	# parentIndex = 0
 	# childIndex = 0
-	# probability = 1
+	# totalFactor = 1
 	# parentEntry=probVectP[parentIndex] #parent
 	# childEntry=probVectC[childIndex] #child
 
@@ -5079,7 +5166,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 	# 	elif parentEntry[0]==childEntry[0] and parentEntry[0]!=6:
 
 	# 		#they are both of type R
-	# 		if entry2[0]==4:
+	# 		if childEntry[0]==4:
 	# 			if parentEntry[1] < childEntry[1]:
 	# 				ref_pos = parentEntry[1]
 	# 				parentIndex+=1
@@ -5096,7 +5183,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 	# 			childEntry=probVectC[childIndex]
 	# 	elif parentEntry[0]==childEntry[0] and parentEntry[0]==6:
 	# 		if useRateVariation:
-	# 				mutMatrix=mutMatrices[pos]
+	# 				mutMatrix=mutMatrices[ref_pos]
 	# 		tot=0.0
 
 	# 		#if we want to factor in the branch length we get the partial
@@ -5111,156 +5198,153 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 	# 		else:
 	# 				for j in range4:
 	# 					tot+=parentEntry[-1][j]*childEntry[-1][j]
-	# 		probability*=tot
+	# 		totalFactor*=tot
 		
 	# 	else:
 	# 		#the child and parent are diff types
 
 	# 		### Did not reimplement these calculations
 	# 		contribLength=bLen
-	# 		if entry1[0]<5:
-	# 			if len(entry1)==3+usingErrorRate:
-	# 				contribLength+=entry1[2]
-	# 			elif len(entry1)==4+usingErrorRate:
-	# 				contribLength+=entry1[3]
-	# 		elif len(entry1)==4:
-	# 			contribLength+=entry1[2]
-	# 		if entry2[0]<5:
-	# 			if len(entry2)==3+usingErrorRate:
-	# 				contribLength+=entry2[2]
-	# 		elif len(entry2)==4:
-	# 			contribLength+=entry2[2]
+	# 		if parentEntry[0]<5:
+	# 			if len(parentEntry)==3+usingErrorRate:
+	# 				contribLength+=parentEntry[2]
+	# 			elif len(parentEntry)==4+usingErrorRate:
+	# 				contribLength+=parentEntry[3]
+	# 		elif len(parentEntry)==4:
+	# 			contribLength+=parentEntry[2]
+	# 		if childEntry[0]<5:
+	# 			if len(childEntry)==3+usingErrorRate:
+	# 				contribLength+=childEntry[2]
+	# 		elif len(childEntry)==4:
+	# 			contribLength+=childEntry[2]
 	# 		### Did not reimplement these calculations
 
 	# 		#if the parent type is R
 	# 		if parentEntry[0]==4: # case entry1 is R	
 	# 			#the child entry is of type "O"
-	# 			if entry2[0]==6:
+	# 			if childEntry[0]==6:
 	# 				if useRateVariation:
-	# 					mutMatrix=mutMatrices[pos]
-	# 				i1=entry2[1]
-	# 				if entry2[-1][i1]>0.02:
-	# 					totalFactor*=entry2[-1][i1]
+	# 					mutMatrix=mutMatrices[ref_pos]
+	# 				#since the child is type 'O', the second element is the base
+	# 				childBase=childEntry[1]
+
+	# 				if childEntry[-1][childBase]>0.02:
+	# 					totalFactor*=childEntry[-1][childBase]
 	# 				else:
-	# 					if len(entry1)==4+usingErrorRate:
-	# 						flag1 = (usingErrorRate and (len(entry1)>2) and entry1[-1] )
+	# 					if len(parentEntry)==4+usingErrorRate:
+	# 						flag1 = (usingErrorRate and (len(parentEntry)>2) and parentEntry[-1] )
 	# 						tot=0.0
-	# 						if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
-	# 						tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=entry2[-1])
-	# 						tot2=getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
+	# 						if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[ref_pos]
+	# 						tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
+	# 						tot2=getPartialVec(childBase, parentEntry[2], mutMatrix, errorRate, flag=flag1)
 	# 						for i in range4:
 	# 							tot+=tot3[i]*tot2[i]*rootFreqs[i]
 	# 						tot/=rootFreqs[i1]
 	# 					else:
 	# 						if contribLength:
-	# 							tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=entry2[-1])
+	# 							tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
 	# 							tot=tot3[i1]
 	# 						else:
-	# 							tot=entry2[-1][i1]
+	# 							tot=childEntry[-1][i1]
 	# 					totalFactor*=tot
-	# 				pos+=1
-	# 				if pos==lRef:
-	# 					break
-	# 				indexEntry2+=1
-	# 				entry2=probVectC[indexEntry2]
+	# 				ref_pos+=1
+	# 				childIndex+=1
+	# 				childEntry=probVectC[childIndex]
 
-	# 			else: #entry1 is R and entry2 is a different but single nucleotide
-	# 				flag2 = (usingErrorRate and (isTipC or (len(entry2)>2) and entry2[-1] ))
+	# 			else: #parentEntry is R and childEntry is a different but single nucleotide
+	# 				flag2 = (usingErrorRate and (isTipC or (len(childEntry)>2) and childEntry[-1] ))
 	# 				if useRateVariation:
-	# 					mutMatrix=mutMatrices[pos]
-	# 				if len(entry1)==4+usingErrorRate:
-	# 					flag1 = (usingErrorRate and (len(entry1)>2) and entry1[-1] )
-	# 					i1=entry2[1]
-	# 					i2=entry2[0]
+	# 					mutMatrix=mutMatrices[ref_pos]
+	# 				#not sure what these calculations are for
+	# 				if len(parentEntry)==4+usingErrorRate:
+	# 					flag1 = (usingErrorRate and (len(parentEntry)>2) and parentEntry[-1] )
+	# 					i1=childEntry[1]
+	# 					i2=childEntry[0]
 	# 					if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
 	# 					tot3=getPartialVec(i2, contribLength, mutMatrix, errorRate, flag=flag2)
-	# 					tot2=getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
+	# 					tot2=getPartialVec(i1, parentEntry[2], mutMatrix, errorRate, flag=flag1)
 	# 					tot=0.0
 	# 					for i in range4:
 	# 						tot+=tot3[i]*tot2[i]*rootFreqs[i]
 	# 					totalFactor*=tot/rootFreqs[i1]
 	# 				else:
 	# 					if flag2:
-	# 						if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
-	# 						totalFactor*=min(0.25,mutMatrix[entry2[1]][entry2[0]]*contribLength)+errorRate*0.33333
+	# 						if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[ref_pos]
+	# 						totalFactor*=min(0.25,mutMatrix[childEntry[1]][childEntry[0]]*contribLength)+errorRate*0.33333
 	# 					else:
 	# 						if contribLength:
-	# 							totalFactor*=min(0.25,mutMatrix[entry2[1]][entry2[0]]*contribLength)
+	# 							totalFactor*=min(0.25,mutMatrix[childEntry[1]][childEntry[0]]*contribLength)
 	# 						else:
 	# 							return float("-inf")
-	# 				pos+=1
-	# 				if pos==lRef:
-	# 					break
-	# 				indexEntry2+=1
-	# 				entry2=probVectC[indexEntry2]
-	# 			if entry1[1]==pos:
-	# 				indexEntry1+=1
-	# 				entry1=probVectP[indexEntry1]
+	# 				ref_pos+=1
+					
+	# 			if parentEntry[1]==ref_pos:
+	# 				parentIndex+=1
+	# 				parentEntry=probVectP[parentIndex]
 
-	# 		# entry1 is of type "O"
-	# 		elif entry1[0]==6:
+	# 		# parentEntry is of type "O"
+	# 		elif parentEntry[0]==6:
 	# 			if useRateVariation:
-	# 				mutMatrix=mutMatrices[pos]
-	# 			if entry2[0]==6:
+	# 				mutMatrix=mutMatrices[ref_pos]
+	# 			if childEntry[0]==6:
 	# 				tot=0.0
 	# 				if contribLength:
-	# 					tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=entry2[-1])
+	# 					tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
 	# 					for j in range4:
-	# 						tot+=entry1[-1][j]*tot3[j]
+	# 						tot+=tot[-1][j]*tot3[j]
 	# 				else:
 	# 					for j in range4:
-	# 						tot+=entry1[-1][j]*entry2[-1][j]
+	# 						tot+=parentEntry[-1][j]*childEntry[-1][j]
 	# 				totalFactor*=tot
 	# 			else: #entry1 is "O" and entry2 is a nucleotide
-	# 				if entry2[0]==4:
-	# 					i2=entry1[1]
+	# 				if childEntry[0]==4:
+	# 					i2=parentEntry[1]
 	# 				else:
-	# 					i2=entry2[0]
-	# 				if entry1[-1][i2]>0.02:
-	# 					totalFactor*=entry1[-1][i2]
+	# 					i2=childEntry[0]
+	# 				if parentEntry[-1][i2]>0.02:
+	# 					totalFactor*=parentEntry[-1][i2]
 	# 				else:
-	# 					if (usingErrorRate and (isTipC or (len(entry2)>2) and entry2[-1] )):
-	# 						if errorRateSiteSpecific: errorRate = errorRates[pos]
+	# 					if (usingErrorRate and (isTipC or (len(childEntry)>2) and childEntry[-1] )):
+	# 						if errorRateSiteSpecific: errorRate = errorRates[ref_pos]
 	# 						tot3=getPartialVec(i2, contribLength, mutMatrix, errorRate, flag=True)
 	# 					else:
 	# 						tot3=getPartialVec(i2, contribLength, mutMatrix, None, flag=False)
 	# 					tot=0.0
 	# 					for j in range4:
-	# 						tot+=entry1[-1][j]*tot3[j]
+	# 						tot+=parentEntry[-1][j]*tot3[j]
 	# 					totalFactor*=tot
-	# 			pos+=1
-	# 			if pos==lRef:
-	# 				break
-	# 			indexEntry1+=1
-	# 			entry1=probVectP[indexEntry1]
-	# 			if entry2[0]!=4 or entry2[1]==pos:
-	# 				indexEntry2+=1
-	# 				entry2=probVectC[indexEntry2]
+	# 			ref_pos+=1
+				
+	# 			parentIndex+=1
+	# 			parentEntry=probVectP[parentIndex]
+	# 			if childEntry[0]!=4 or childEntry[1]==ref_pos:
+	# 				childIndex+=1
+	# 				childEntry=probVectC[childIndex]
 
 	# 		else: #entry1 is a non-ref nuc
-	# 			if entry2[0]!=entry1[0]:
-	# 				flag1 = (usingErrorRate and (len(entry1)>2) and entry1[-1] )
+	# 			if childEntry[0]!=parentEntry[0]:
+	# 				flag1 = (usingErrorRate and (len(parentEntry)>2) and parentEntry[-1] )
 	# 				if useRateVariation:
-	# 					mutMatrix=mutMatrices[pos]
+	# 					mutMatrix=mutMatrices[ref_pos]
 
-	# 				i1=entry1[0]
-	# 				if entry2[0]<5: #entry2 is a nucleotide
-	# 					if entry2[0]==4:
-	# 						i2=entry1[1]
+	# 				i1=parentEntry[0]
+	# 				if childEntry[0]<5: #entry2 is a nucleotide
+	# 					if childEntry[0]==4:
+	# 						i2=parentEntry[1]
 	# 					else:
-	# 						i2=entry2[0]
-	# 					flag2 = (usingErrorRate and (isTipC or (len(entry2)>2) and entry2[-1] ))
-	# 					if len(entry1)==4+usingErrorRate:
-	# 						if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
+	# 						i2=childEntry[0]
+	# 					flag2 = (usingErrorRate and (isTipC or (len(childEntry)>2) and childEntry[-1] ))
+	# 					if len(parentEntry)==4+usingErrorRate:
+	# 						if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[ref_pos]
 	# 						tot3=getPartialVec(i2, contribLength, mutMatrix, errorRate, flag=flag2)
-	# 						tot2=getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
+	# 						tot2=getPartialVec(i1, parentEntry[2], mutMatrix, errorRate, flag=flag1)
 	# 						tot=0.0
 	# 						for j in range4:
 	# 							tot+=rootFreqs[j]*tot3[j]*tot2[j]
 	# 						totalFactor*=tot/rootFreqs[i1]
 	# 					else:
 	# 						if flag1 or flag2:
-	# 							if errorRateSiteSpecific: errorRate = errorRates[pos]
+	# 							if errorRateSiteSpecific: errorRate = errorRates[ref_pos]
 	# 							totalFactor*=(min(0.25,mutMatrix[i1][i2]*contribLength)+(flag1 + flag2)*0.33333*errorRate)
 	# 						else:
 	# 							if contribLength:
@@ -5269,32 +5353,32 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 	# 								return float("-inf")
 
 	# 				else: #entry1 is a nucleotide and entry2 is of type "O"
-	# 					if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
-	# 					if entry2[-1][i1]>0.02:
-	# 						totalFactor*=entry2[-1][i1]
+	# 					if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[ref_pos]
+	# 					if childEntry[-1][i1]>0.02:
+	# 						totalFactor*=childEntry[-1][i1]
 	# 					else:
-	# 						if len(entry1)==4+usingErrorRate:
-	# 							tot2=getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
-	# 							tot3=getPartialVec(6, contribLength, mutMatrix, errorRate, vect=entry2[-1])
+	# 						if len(parentEntry)==4+usingErrorRate:
+	# 							tot2=getPartialVec(i1, parentEntry[2], mutMatrix, errorRate, flag=flag1)
+	# 							tot3=getPartialVec(6, contribLength, mutMatrix, errorRate, vect=childEntry[-1])
 	# 							tot=0.0
 	# 							for i in range4:
 	# 								tot+=tot2[i]*tot3[i]*rootFreqs[i]
 	# 							totalFactor*=(tot/rootFreqs[i1])
 	# 						else:
 	# 							if contribLength:
-	# 								tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=entry2[-1])
+	# 								tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
 	# 								totalFactor*=tot3[i1]
 	# 							else:
-	# 								totalFactor*=entry2[-1][i1]
+	# 								totalFactor*=childEntry[-1][i1]
 
-	# 			pos+=1
-	# 			if pos==lRef:
+	# 			ref_pos+=1
+	# 			if ref_pos==lRef:
 	# 				break
-	# 			indexEntry1+=1
-	# 			entry1=probVectP[indexEntry1]
-	# 			if entry2[0]!=4 or entry2[1]==pos:
-	# 				indexEntry2+=1
-	# 				entry2=probVectC[indexEntry2]
+	# 			parentIndex+=1
+	# 			parentEntry=probVectP[parentIndex]
+	# 			if childEntry[0]!=4 or childEntry[1]==ref_pos:
+	# 				childIndex+=1
+	# 				childEntry=probVectC[childIndex]
 
 	# 	if totalFactor<=minimumCarryOver:
 	# 		try:
