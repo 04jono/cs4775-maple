@@ -2442,13 +2442,13 @@ def probVectTerminalNode(diffs,tree,node):
 							if updated_ambiguities[i]!=0:
 								updated_ambiguities[i] -= errorRate/9
 							else:
-								updated_ambiguities[i]+=errorRate*0.33333
+								updated_ambiguities[i]=errorRate*0.33333
 					elif diff_type in ambiguities:
 						for i in range(len(updated_ambiguities)):
 							if updated_ambiguities[i]!=0:
 								updated_ambiguities[i] -= errorRate*0.33333
 							else:
-								updated_ambiguities[i]+=errorRate*0.33333
+								updated_ambiguities[i]=errorRate*0.33333
 					
 					probVect.append((6,tree_ref_nucl,updated_ambiguities))
 				else:
@@ -2525,9 +2525,9 @@ def updateProbVectTerminalNode(probVect,numMinSeqs):
 							probs[i] = .5
 					else:
 						if probs[i] < 0.2:
-							probs[i] = errorRate * .3333
+							probs[i] = errorRate * .33333
 						else:
-							probs[i] = 0.5 - (.3333)*errorRate
+							probs[i] = 0.5 - (.33333)*errorRate
 
 			elif num_ambiguous_nucl == 3:
 				for i in range(4):             # for V instead of [⅓, ⅓, ⅓, 0] we get, [ ⅓ - ε/9,  ⅓ -ε/9,  ⅓ -ε/9,  ⅓ε]
@@ -2538,9 +2538,9 @@ def updateProbVectTerminalNode(probVect,numMinSeqs):
 							probs[i] = 1/3.0
 					else:
 						if probs[i] < 0.2:
-							probs[i] = errorRate * .3333
+							probs[i] = errorRate * .33333
 						else:
-							probs[i] = 1/3.0 - (.3333)*errorRate
+							probs[i] = 1/3.0 -errorRate/9
 			reference_pos+=1
 		
 		
@@ -2627,16 +2627,22 @@ def getPartialVec(i12, totLen, mutMatrix, errorRate, vect=None, upNode=False, fl
 	:param upNode: should be True if the nucleotide was observed above the branch.
 	:return: the new likelihood vector for this entry.
 	"""
+
+	#refactor calculating the partial for O entries and entries where we are interested 
+	#in usingErrorRate as they reuse the same logic
+	 
 	def calculatePartialHelper(length,up,matrix,vector):
-	
+		if (not totLen):
+			return vector
+		
 		result = []
 		for i in range(4):
 			temp = 0
 			for j in range(4):
 				if up:
-					temp += matrix[i][j] * vector[j]
-				else:
 					temp += matrix[j][i] * vector[j]
+				else:
+					temp += matrix[i][j] * vector[j]
 			temp*=length
 			temp += vector[i]
 
@@ -2646,14 +2652,34 @@ def getPartialVec(i12, totLen, mutMatrix, errorRate, vect=None, upNode=False, fl
 			result.append(temp)
 		return result
 
-	if i12==6:
+	if i12==6: # entry is O
 		newVect=list(vect)
-	elif usingErrorRate and flag:
-		newVect = [errorRate*0.33333] * 4  # without error rate [0.0, 0.0, 0.0, 0.0]
-		newVect[i12] = 1.0 - errorRate  # without error rate: 1.0
-	else:  # no flag (no error rate)
+	elif usingErrorRate and flag: #entry is not O and usingErrorRate and flag
+		newVect = [errorRate*0.33333] * 4  
+		newVect[i12] = 1.0 - errorRate  
+		upNode = False
+	else:  #entry is not O and no error rate
 		newVect=[0.0,0.0,0.0,0.0]
 		newVect[i12]+=1.0
+		if (not totLen):
+			return newVect
+		newVect = []
+
+		#updating the partial likelihoods for this base
+		if upNode:
+			for i in range4:
+				newVect.append(mutMatrix[i12][i] * totLen)
+		else:
+			for i in range4:
+				newVect.append(mutMatrix[i][i12] * totLen)
+
+		newVect[i12]+=1.0
+
+		#if mutation probabilities dip below 0 then they are not related
+		if newVect[i12]<0: 
+			return [0.25,0.25,0.25,0.25]
+		
+		return newVect
 		
 	return calculatePartialHelper(totLen,upNode,mutMatrix,newVect)
 
@@ -3402,58 +3428,126 @@ def findProbRoot(probVect,node=None,mutations=None,up=None):
 
 
 def rootVector(probVect, bLen, isFromTip, tree, node):
-    """
-    For the root node, calculate the likelihood genome list by incorporating branch lengths and root frequencies.
-    """
+	nodeList=[]
+	mutations=tree.mutations
+	up=tree.up
+	if mutations[node]:
+		probVect=passGenomeListThroughBranch(probVect, mutations[node], dirIsUp=True) #, modifyCurrentList=False
+	nodeList.append(node)
+	node=up[node]
+	while node!=None:
+		nodeList.append(node)
+		if mutations[node]:
+			probVect=passGenomeListThroughBranch(probVect, mutations[node], dirIsUp=True) #, modifyCurrentList=True
+		node=up[node]
+	newProbVect=[]
+	newPos=0
+	for entry in probVect:
+		if entry[0]==5:
+			newProbVect.append(entry)
+			newPos=entry[1]
+		elif entry[0]==6:
+			totBLen=bLen
+			if len(entry)>3:
+				totBLen+=entry[2]
+			if totBLen:
+				if useRateVariation:
+					newVect=getPartialVec(6, totBLen, mutMatrices[newPos], 0, vect=entry[-1])
+				else:
+					newVect=getPartialVec(6, totBLen, mutMatrixGlobal, 0, vect=entry[-1])
+				for i in range4:
+					newVect[i]*=rootFreqs[i]
+			else:
+				newVect=[]
+				for i in range4:
+					newVect.append(entry[-1][i]*rootFreqs[i])
+			totSum=sum(newVect)
+			for i in range4:
+				newVect[i]/=totSum
+			newProbVect.append((6,entry[1],newVect))
+			newPos+=1
+		else:
+			if usingErrorRate:
+				flag1 = ((len(entry)>2) and entry[-1]) or isFromTip
+				if len(entry)>3:
+					newProbVect.append((entry[0],entry[1],entry[2]+bLen,0.0,flag1))
+				else:
+					if bLen or flag1:
+						newProbVect.append((entry[0],entry[1],bLen,0.0,flag1))
+					else:
+						newProbVect.append((entry[0],entry[1]))
+			else:
+				if len(entry)==3:
+					newProbVect.append((entry[0],entry[1],entry[2]+bLen,0.0))
+				else:
+					if bLen:
+						newProbVect.append((entry[0],entry[1],bLen,0.0))
+					else:
+						newProbVect.append((entry[0],entry[1]))
+			if entry[0]<4:
+				newPos+=1
+			else:
+				newPos=entry[1]
+
+	while nodeList:
+		node=nodeList.pop()
+		if mutations[node]:
+			newProbVect=passGenomeListThroughBranch(newProbVect, mutations[node], dirIsUp=False)
+	shorten(newProbVect)
+					
+	return newProbVect
+    # """
+    # For the root node, calculate the likelihood genome list by incorporating branch lengths and root frequencies.
+    # """
 		
-    def processEntry(entry, bLen, newPos, isFromTip):
-        """Process a single entry from probVect."""
-        if entry[0] == 5: #keeps entry as is
-            return entry, entry[1]
-        elif entry[0] == 6: #updates likelihoods using bLen and root frequencies
-            totBLen = bLen + (entry[2] if len(entry) > 3 else 0)
-            newVect = (
-                getPartialVec(6, totBLen, mutMatrices[newPos], 0, vect=entry[-1]) if useRateVariation else
-                getPartialVec(6, totBLen, mutMatrixGlobal, 0, vect=entry[-1])
-            ) if totBLen else [
-                freq * value for freq, value in zip(rootFreqs, entry[-1])
-            ]
-            totSum = sum(newVect)
-            newVect = [v / totSum for v in newVect]
-            return (6, entry[1], newVect), newPos + 1
-        else:
-            flag1 = ((len(entry) > 2) and entry[-1]) or isFromTip
-            newEntry = (
-                (entry[0], entry[1], entry[2] + bLen, 0.0, flag1) if len(entry) > 3 else
-                (entry[0], entry[1], bLen, 0.0, flag1) if bLen or flag1 else
-                (entry[0], entry[1])
-            )
-            newPos = newPos + 1 if entry[0] < 4 else entry[1]
-            return newEntry, newPos
+    # def processEntry(entry, bLen, newPos, isFromTip):
+    #     """Process a single entry from probVect."""
+    #     if entry[0] == 5: #keeps entry as is
+    #         return entry, entry[1]
+    #     elif entry[0] == 6: #updates likelihoods using bLen and root frequencies
+    #         totBLen = bLen + (entry[2] if len(entry) > 3 else 0)
+    #         newVect = (
+    #             getPartialVec(6, totBLen, mutMatrices[newPos], 0, vect=entry[-1]) if useRateVariation else
+    #             getPartialVec(6, totBLen, mutMatrixGlobal, 0, vect=entry[-1])
+    #         ) if totBLen else [
+    #             freq * value for freq, value in zip(rootFreqs, entry[-1])
+    #         ]
+    #         totSum = sum(newVect)
+    #         newVect = [v / totSum for v in newVect]
+    #         return (6, entry[1], newVect), newPos + 1
+    #     else:
+    #         flag1 = ((len(entry) > 2) and entry[-1]) or isFromTip
+    #         newEntry = (
+    #             (entry[0], entry[1], entry[2] + bLen, 0.0, flag1) if len(entry) > 3 else
+    #             (entry[0], entry[1], bLen, 0.0, flag1) if bLen or flag1 else
+    #             (entry[0], entry[1])
+    #         )
+    #         newPos = newPos + 1 if entry[0] < 4 else entry[1]
+    #         return newEntry, newPos
 
-    # upward tree (processing mutations) - collects nodes along upward path
-    nodeList = []
-    while node is not None:
-        nodeList.append(node)
-        if tree.mutations[node]:
-            probVect = passGenomeListThroughBranch(probVect, tree.mutations[node], dirIsUp=True)
-        node = tree.up[node]
+    # # upward tree (processing mutations) - collects nodes along upward path
+    # nodeList = []
+    # while node is not None:
+    #     nodeList.append(node)
+    #     if tree.mutations[node]:
+    #         probVect = passGenomeListThroughBranch(probVect, tree.mutations[node], dirIsUp=True)
+    #     node = tree.up[node]
 
-    # Go through each entry in probVect
-    newProbVect = []
-    newPos = 0
-    for entry in probVect:
-        processedEntry, newPos = processEntry(entry, bLen, newPos, isFromTip)
-        newProbVect.append(processedEntry)
+    # # Go through each entry in probVect
+    # newProbVect = []
+    # newPos = 0
+    # for entry in probVect:
+    #     processedEntry, newPos = processEntry(entry, bLen, newPos, isFromTip)
+    #     newProbVect.append(processedEntry)
 
-    # Go down (reapply mutations)
-    while nodeList:
-        node = nodeList.pop()
-        if tree.mutations[node]:
-            newProbVect = passGenomeListThroughBranch(newProbVect, tree.mutations[node], dirIsUp=False)
+    # # Go down (reapply mutations)
+    # while nodeList:
+    #     node = nodeList.pop()
+    #     if tree.mutations[node]:
+    #         newProbVect = passGenomeListThroughBranch(newProbVect, tree.mutations[node], dirIsUp=False)
 
-    shorten(newProbVect) #trims newProbVect - look at 'shorten'
-    return newProbVect
+    # shorten(newProbVect) #trims newProbVect - look at 'shorten'
+    # return newProbVect
 
 
 #function to add new mutation events in new sample to the pre-exisitng pseudocounts so to improve the estimate of the substitution rates.
