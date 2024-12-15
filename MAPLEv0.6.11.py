@@ -2205,29 +2205,40 @@ def simplify(vec,refA):
 
 #Shorten genome list by merging together R entries that are mergeable (that have the same details and are neighbours).
 def shorten(vec):
-	entryOld=vec[0]
-	index=0
-	while index<len(vec)-1:
-		newVec=vec[index+1]
-		if newVec[0]==4 and entryOld[0]==4 and len(newVec)==len(entryOld):
-			if len(newVec)==2:
-				vec.pop(index)
-			elif abs(newVec[2]-entryOld[2])>thresholdProb:
-				index+=1
-				entryOld=vec[index]
-			elif len(newVec)==3:
-				vec.pop(index)
-			elif abs(newVec[3]-entryOld[3])>thresholdProb:
-				index+=1
-				entryOld=vec[index]
-			elif len(newVec)==4 or (newVec[4]==entryOld[4]):
-				vec.pop(index)
-			else:
-				index+=1
-				entryOld=vec[index]
+	prevEntry = vec[0]
+	currIndex = 1
+	
+	while currIndex < len(vec):
+		currEntry = vec[currIndex]
+		# If entry to merge to is not an R entry, continue
+		if prevEntry[0] != 4:
+			prevEntry = currEntry
+			currIndex += 1
+			continue
+		# If entry to try merging from is not an R entry, continue
+		if currEntry[0] != 4:
+			prevEntry = currEntry
+			currIndex += 1
+			continue
+		# Stored values are not the same, cannot merge
+		if len(currEntry) != len(prevEntry):
+			prevEntry = currEntry
+			currIndex += 1
+			continue
+		
+		# We can merge these 2 R entries
+		if len(currEntry) == 2:
+			vec.pop(currIndex - 1)
+		elif len(currEntry) == 3 and abs(currEntry[2] - prevEntry[2]) <= thresholdProb:
+			vec.pop(currIndex - 1)
+		elif len(currEntry) == 4 and abs(currEntry[2] - prevEntry[2]) <= thresholdProb and abs(currEntry[2] - prevEntry[2]) <= thresholdProb:
+			vec.pop(currIndex - 1)
+		elif len(currEntry) == 5 and currEntry[4] == prevEntry[4]:
+			vec.pop(currIndex - 1)
 		else:
-			index+=1
-			entryOld=vec[index]
+			# Entries don't meet threshold for merging
+			prevEntry = currEntry
+			currIndex += 1
 	return
 
 
@@ -3264,7 +3275,7 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 									cumulPartLk-=cumErrorRate
 								if ((not fromTip2) and flag2):
 									cumulPartLk-=cumErrorRate
-                
+				
 			elif (not totLen1) and (not totLen2) and entry1[0]<5 and entry2[0]<5 and (not flag1) and (not flag2): #0 distance between different nucleotides: merge is not possible
 				if returnLK:
 					print("mergeVectors() returning None 1")
@@ -3496,58 +3507,58 @@ def rootVector(probVect, bLen, isFromTip, tree, node):
 	shorten(newProbVect)
 					
 	return newProbVect
-    # """
-    # For the root node, calculate the likelihood genome list by incorporating branch lengths and root frequencies.
-    # """
+	# """
+	# For the root node, calculate the likelihood genome list by incorporating branch lengths and root frequencies.
+	# """
 		
-    # def processEntry(entry, bLen, newPos, isFromTip):
-    #     """Process a single entry from probVect."""
-    #     if entry[0] == 5: #keeps entry as is
-    #         return entry, entry[1]
-    #     elif entry[0] == 6: #updates likelihoods using bLen and root frequencies
-    #         totBLen = bLen + (entry[2] if len(entry) > 3 else 0)
-    #         newVect = (
-    #             getPartialVec(6, totBLen, mutMatrices[newPos], 0, vect=entry[-1]) if useRateVariation else
-    #             getPartialVec(6, totBLen, mutMatrixGlobal, 0, vect=entry[-1])
-    #         ) if totBLen else [
-    #             freq * value for freq, value in zip(rootFreqs, entry[-1])
-    #         ]
-    #         totSum = sum(newVect)
-    #         newVect = [v / totSum for v in newVect]
-    #         return (6, entry[1], newVect), newPos + 1
-    #     else:
-    #         flag1 = ((len(entry) > 2) and entry[-1]) or isFromTip
-    #         newEntry = (
-    #             (entry[0], entry[1], entry[2] + bLen, 0.0, flag1) if len(entry) > 3 else
-    #             (entry[0], entry[1], bLen, 0.0, flag1) if bLen or flag1 else
-    #             (entry[0], entry[1])
-    #         )
-    #         newPos = newPos + 1 if entry[0] < 4 else entry[1]
-    #         return newEntry, newPos
+	# def processEntry(entry, bLen, newPos, isFromTip):
+	#     """Process a single entry from probVect."""
+	#     if entry[0] == 5: #keeps entry as is
+	#         return entry, entry[1]
+	#     elif entry[0] == 6: #updates likelihoods using bLen and root frequencies
+	#         totBLen = bLen + (entry[2] if len(entry) > 3 else 0)
+	#         newVect = (
+	#             getPartialVec(6, totBLen, mutMatrices[newPos], 0, vect=entry[-1]) if useRateVariation else
+	#             getPartialVec(6, totBLen, mutMatrixGlobal, 0, vect=entry[-1])
+	#         ) if totBLen else [
+	#             freq * value for freq, value in zip(rootFreqs, entry[-1])
+	#         ]
+	#         totSum = sum(newVect)
+	#         newVect = [v / totSum for v in newVect]
+	#         return (6, entry[1], newVect), newPos + 1
+	#     else:
+	#         flag1 = ((len(entry) > 2) and entry[-1]) or isFromTip
+	#         newEntry = (
+	#             (entry[0], entry[1], entry[2] + bLen, 0.0, flag1) if len(entry) > 3 else
+	#             (entry[0], entry[1], bLen, 0.0, flag1) if bLen or flag1 else
+	#             (entry[0], entry[1])
+	#         )
+	#         newPos = newPos + 1 if entry[0] < 4 else entry[1]
+	#         return newEntry, newPos
 
-    # # upward tree (processing mutations) - collects nodes along upward path
-    # nodeList = []
-    # while node is not None:
-    #     nodeList.append(node)
-    #     if tree.mutations[node]:
-    #         probVect = passGenomeListThroughBranch(probVect, tree.mutations[node], dirIsUp=True)
-    #     node = tree.up[node]
+	# # upward tree (processing mutations) - collects nodes along upward path
+	# nodeList = []
+	# while node is not None:
+	#     nodeList.append(node)
+	#     if tree.mutations[node]:
+	#         probVect = passGenomeListThroughBranch(probVect, tree.mutations[node], dirIsUp=True)
+	#     node = tree.up[node]
 
-    # # Go through each entry in probVect
-    # newProbVect = []
-    # newPos = 0
-    # for entry in probVect:
-    #     processedEntry, newPos = processEntry(entry, bLen, newPos, isFromTip)
-    #     newProbVect.append(processedEntry)
+	# # Go through each entry in probVect
+	# newProbVect = []
+	# newPos = 0
+	# for entry in probVect:
+	#     processedEntry, newPos = processEntry(entry, bLen, newPos, isFromTip)
+	#     newProbVect.append(processedEntry)
 
-    # # Go down (reapply mutations)
-    # while nodeList:
-    #     node = nodeList.pop()
-    #     if tree.mutations[node]:
-    #         newProbVect = passGenomeListThroughBranch(newProbVect, tree.mutations[node], dirIsUp=False)
+	# # Go down (reapply mutations)
+	# while nodeList:
+	#     node = nodeList.pop()
+	#     if tree.mutations[node]:
+	#         newProbVect = passGenomeListThroughBranch(newProbVect, tree.mutations[node], dirIsUp=False)
 
-    # shorten(newProbVect) #trims newProbVect - look at 'shorten'
-    # return newProbVect
+	# shorten(newProbVect) #trims newProbVect - look at 'shorten'
+	# return newProbVect
 
 
 #function to add new mutation events in new sample to the pre-exisitng pseudocounts so to improve the estimate of the substitution rates.
