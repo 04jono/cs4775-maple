@@ -5,17 +5,12 @@ import math
 def compare_tree_nodes(tree1, tree2, length_threshold=1e-14):
     """
     Recursively compare nodes of two trees, finding symmetric differences,
-    intersections, and branch length discrepancies within a threshold.
-
-    Parameters:
-        tree1 (dendropy.Tree): First tree.
-        tree2 (dendropy.Tree): Second tree.
-        length_threshold (float): Threshold for acceptable branch length differences.
-
-    Returns:
-        None
+    intersections, and branch length discrepancies within 10^-14 threshold.
     """
+    total_length_diff = 0  # To accumulate branch length discrepancies
+
     def visit(node1, node2, path="root"):
+        nonlocal total_length_diff
         if node1 is None or node2 is None:
             print(f"Mismatch at {path}: One node is missing.")
             return
@@ -41,6 +36,7 @@ def compare_tree_nodes(tree1, tree2, length_threshold=1e-14):
             if length1 is not None and length2 is not None:
                 if not math.isclose(length1, length2, rel_tol=0, abs_tol=length_threshold):
                     print(f"  Branch length discrepancy for {label}: Tree1={length1}, Tree2={length2}")
+                    total_length_diff += abs(length1 - length2)
 
         # Recurse into common children
         for label in common_labels:
@@ -50,18 +46,12 @@ def compare_tree_nodes(tree1, tree2, length_threshold=1e-14):
 
     visit(tree1.seed_node, tree2.seed_node)
 
-def calculate_rf_distance(tree_file1, tree_file2, length_threshold=1e-14):
+    return total_length_diff
+
+def calculate_rf_and_rfl_distance(tree_file1, tree_file2, length_threshold=1e-14):
     """
-    Calculate the Robinson-Foulds (RF) distance between two phylogenetic trees,
-    (the original and the new) and compare their nodes and branch lengths.
-
-    Parameters:
-        tree_file1 (str): Path to the first .tree file (the original).
-        tree_file2 (str): Path to the second .tree file (ours).
-        length_threshold (float): Threshold for acceptable branch length differences.
-
-    Returns:
-        int: The RF distance between the two trees.
+    Calculate both Robinson-Foulds (RF) and Branch Length Robinson-Foulds (RFL) distances 
+    between two phylogenetic trees and compare their nodes and branch lengths.
     """
     # Shared taxon namespace
     taxa = dendropy.TaxonNamespace()
@@ -70,28 +60,28 @@ def calculate_rf_distance(tree_file1, tree_file2, length_threshold=1e-14):
     tree1 = dendropy.Tree.get(path=tree_file1, schema="newick", taxon_namespace=taxa)
     tree2 = dendropy.Tree.get(path=tree_file2, schema="newick", taxon_namespace=taxa)
 
-    # Unweighted Robinson-Foulds distance
+    # Unweighted Robinson-Foulds distance (RF)
     rf_distance = treecompare.symmetric_difference(tree1, tree2)
 
     # Compare nodes and branch lengths for diffs
     print("Comparing node differences and branch lengths:")
-    compare_tree_nodes(tree1, tree2, length_threshold=length_threshold)
+    total_length_diff = compare_tree_nodes(tree1, tree2, length_threshold=length_threshold)
 
-    return rf_distance
+    # Calculate the RFL distance as the sum of RF distance + branch length discrepancy
+    rfl_distance = rf_distance + total_length_diff
+
+    return rf_distance, rfl_distance
 
 # File paths of the two trees
 tree_file1 = "og_output_tree.tree"
 tree_file2 = "ours_output_tree.tree"
 
-# Calculating
-rf_distance = calculate_rf_distance(tree_file1, tree_file2, length_threshold=1e-14)
+rf_distance, rfl_distance = calculate_rf_and_rfl_distance(tree_file1, tree_file2, length_threshold=1e-14)
 
-# RF distance (quant) output 
-print(f"The Robinson-Foulds distance is: {rf_distance}")
+print(f"The Robinson-Foulds distance (RF) is: {rf_distance}")
+print(f"The Branch Length Robinson-Foulds distance (RFL) is: {rfl_distance}")
 
-if rf_distance == 0:
+if rf_distance == 0 and rfl_distance == 0:
     print("The trees are identical.")
 else:
-    print(f"The Robinson-Foulds distance is: {rf_distance}")
-
-
+    print(f"RF Distance: {rf_distance}, RFL Distance: {rfl_distance}")
