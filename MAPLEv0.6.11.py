@@ -5139,6 +5139,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 					#if the childEntry is type R, then we need to use the first entry
 					#in the parent as the base
 					if childEntry[0]==4:
+		
 						i2=parentEntry[1]
 					else:
 						i2=childEntry[0]
