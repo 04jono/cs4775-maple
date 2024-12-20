@@ -5,9 +5,9 @@ import math
 def compare_tree_nodes(tree1, tree2, length_threshold=1e-14):
     """
     Recursively compare nodes of two trees, finding symmetric differences,
-    intersections, and branch length discrepancies within 10^-14 threshold.
+    intersections, and branch length discrepancies within a threshold.
     """
-    total_length_diff = 0  # To accumulate branch length discrepancies
+    total_length_diff = 0  
 
     def visit(node1, node2, path="root"):
         nonlocal total_length_diff
@@ -50,8 +50,8 @@ def compare_tree_nodes(tree1, tree2, length_threshold=1e-14):
 
 def calculate_rf_and_rfl_distance(tree_file1, tree_file2, length_threshold=1e-14):
     """
-    Calculate both Robinson-Foulds (RF) and Branch Length Robinson-Foulds (RFL) distances 
-    between two phylogenetic trees and compare their nodes and branch lengths.
+    Calculate Robinson-Foulds (RF), maximum RF, and Branch Length Robinson-Foulds (RFL) distances
+    between two phylogenetic trees, along with node and branch length comparisons.
     """
     # Shared taxon namespace
     taxa = dendropy.TaxonNamespace()
@@ -63,25 +63,28 @@ def calculate_rf_and_rfl_distance(tree_file1, tree_file2, length_threshold=1e-14
     # Unweighted Robinson-Foulds distance (RF)
     rf_distance = treecompare.symmetric_difference(tree1, tree2)
 
-    # Compare nodes and branch lengths for diffs
+    # Maximum RF distance (2(n - 3))
+    n_taxa = len(taxa)
+    max_rf_distance = 2 * (n_taxa - 3)
+
     print("Comparing node differences and branch lengths:")
     total_length_diff = compare_tree_nodes(tree1, tree2, length_threshold=length_threshold)
 
-    # Calculate the RFL distance as the sum of RF distance + branch length discrepancy
     rfl_distance = rf_distance + total_length_diff
 
-    return rf_distance, rfl_distance
+    return rf_distance, max_rf_distance, rfl_distance
 
-# File paths of the two trees
-tree_file1 = "og_output_tree.tree"
-tree_file2 = "ours_output_tree.tree"
+# Input tree files - can be replaced with any two .tree files
+tree_file1 = "_tree.tree"  # Our tree
+tree_file2 = "may12021.fasta.treefile"  # IQ-TREE
 
-rf_distance, rfl_distance = calculate_rf_and_rfl_distance(tree_file1, tree_file2, length_threshold=1e-14)
+rf_distance, max_rf_distance, rfl_distance = calculate_rf_and_rfl_distance(tree_file1, tree_file2, length_threshold=1e-14)
 
 print(f"The Robinson-Foulds distance (RF) is: {rf_distance}")
+print(f"The Maximum Robinson-Foulds distance (Max RF) is: {max_rf_distance}")
 print(f"The Branch Length Robinson-Foulds distance (RFL) is: {rfl_distance}")
 
 if rf_distance == 0 and rfl_distance == 0:
     print("The trees are identical.")
 else:
-    print(f"RF Distance: {rf_distance}, RFL Distance: {rfl_distance}")
+    print(f"RF Distance: {rf_distance}, Max RF Distance: {max_rf_distance}, RFL Distance: {rfl_distance}")
