@@ -7,4 +7,6 @@
 
 3. Run `createMapleFile.py` using an aligned reference (Wuhan-Hu-1) to create a MAPLE alignment file.
 
-4. Run `MAPLEv0.6.11.py` on the MAPLE alignment file.
+4. Run `MAPLEv0.6.11.py` on the MAPLE alignment file:
+
+` pypy3 MAPLEv0.6.11.py --input <input file> --output <output directory>`
