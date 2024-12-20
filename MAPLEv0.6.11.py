@@ -5045,7 +5045,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 						tot3=getPartialVec(i2, contribLength, mutMatrix, errorRate, flag=flag2)
 						tot2=getPartialVec(i1, parentEntry[2], mutMatrix, errorRate, flag=flag1)
 						tot=0.0
-						for i in range4:
+						for i in range(4):
 							tot+=tot3[i]*tot2[i]*rootFreqs[i]
 						totalFactor*=tot/rootFreqs[i1]
 					else:
@@ -5088,7 +5088,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 						tot3=getPartialVec(i2, contribLength, mutMatrix, errorRate, flag=flag2)
 						tot2=getPartialVec(i1, parentEntry[2], mutMatrix, errorRate, flag=flag1)
 						tot=0.0
-						for j in range4:
+						for j in range(4):
 							tot+=rootFreqs[j]*tot3[j]*tot2[j]
 						totalFactor*=tot/rootFreqs[i1]
 					else:
@@ -5122,11 +5122,11 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 					tot=0.0
 					if contribLength:
 						#use getPartialVec to calculate qX1X2 (l2 + c1) v(X2)
-						tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
+						childMutationLikelihood=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
 						for j in range4:
 							#sum getPartialVec results with the vector partials in the parent entry
 							#from the result of tot3, sum over v(X1)
-							tot+=parentEntry[-1][j]*tot3[j]
+							tot+=parentEntry[-1][j]*childMutationLikelihood[j]
 					else:
 						for j in range4:
 							tot+=parentEntry[-1][j]*childEntry[-1][j]
@@ -5151,25 +5151,25 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 					
 					if childEntry[0]==4:
 		
-						i2=parentEntry[1]
+						childBase=parentEntry[1]
 					else:
-						i2=childEntry[0]
+						childBase=childEntry[0]
 	
-					if parentEntry[-1][i2]>0.02:
-						totalFactor*=parentEntry[-1][i2]
+					if parentEntry[-1][childBase]>0.02:
+						totalFactor*=parentEntry[-1][childBase]
 					else:
 						#Did not reimplement this code with flag and error logic
 						if (usingErrorRate and (isTipC or (len(childEntry)>2) and childEntry[-1] )):
 							if errorRateSiteSpecific: errorRate = errorRates[ref_pos]
-							tot3=getPartialVec(i2, contribLength, mutMatrix, errorRate, flag=True)
+							tot3=getPartialVec(childBase, contribLength, mutMatrix, errorRate, flag=True)
 						else:
 							#this is for ease of operation when calculating the probabilities of
 							#mutating from one base to another when the entry for the child
 							#is not a partial vector
-							tot3=getPartialVec(i2, contribLength, mutMatrix, None, flag=False)
+							partialVecWithMutation=getPartialVec(childBase, contribLength, mutMatrix, None, flag=False)
 						tot=0.0
-						for j in range4:
-							tot+=parentEntry[-1][j]*tot3[j]
+						for j in range(4):
+							tot+=parentEntry[-1][j]*partialVecWithMutation[j]
 						totalFactor*=tot
 
 					ref_pos+=1
@@ -5185,9 +5185,9 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 					#Did not reimplement this code with flag and error logic
 					if useRateVariation:
 						mutMatrix=mutMatrices[ref_pos]
-					i1=childEntry[1]
-					if childEntry[-1][i1]>0.02:
-						totalFactor*=childEntry[-1][i1]
+					referenceBase=childEntry[1]
+					if childEntry[-1][referenceBase]>0.02:
+						totalFactor*=childEntry[-1][referenceBase]
 					else:
 						#Did not reimplement this code with flag and error logic
 						if len(parentEntry)==4+usingErrorRate:
@@ -5195,16 +5195,16 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 							tot=0.0
 							if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[ref_pos]
 							tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
-							tot2=getPartialVec(i1, parentEntry[2], mutMatrix, errorRate, flag=flag1)
+							tot2=getPartialVec(referenceBase, parentEntry[2], mutMatrix, errorRate, flag=flag1)
 							for i in range4:
 								tot+=tot3[i]*tot2[i]*rootFreqs[i]
-							tot/=rootFreqs[i1]
+							tot/=rootFreqs[referenceBase]
 						else:
 							if contribLength:
-								tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
-								tot=tot3[i1]
+								partialVecWithMutation=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
+								tot=partialVecWithMutation[referenceBase]
 							else:
-								tot=childEntry[-1][i1]
+								tot=childEntry[-1][referenceBase]
 						totalFactor*=tot
 					ref_pos+=1
 					if ref_pos==lRef:
@@ -5223,26 +5223,28 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 					if useRateVariation:
 						mutMatrix=mutMatrices[ref_pos]
 
-					i1=parentEntry[0]
+					parentBase=parentEntry[0]
+
 					#Did not reimplement this code with flag and error logic
 					if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[ref_pos]
-					if childEntry[-1][i1]>0.02:
-						totalFactor*=childEntry[-1][i1]
+					if childEntry[-1][parentBase]>0.02:
+						totalFactor*=childEntry[-1][parentBase]
 					else:
 						#Did not reimplement this code with flag and error logic
 						if len(parentEntry)==4+usingErrorRate:
-							tot2=getPartialVec(i1, parentEntry[2], mutMatrix, errorRate, flag=flag1)
+							tot2=getPartialVec(parentBase, parentEntry[2], mutMatrix, errorRate, flag=flag1)
 							tot3=getPartialVec(6, contribLength, mutMatrix, errorRate, vect=childEntry[-1])
 							tot=0.0
 							for i in range4:
 								tot+=tot2[i]*tot3[i]*rootFreqs[i]
-							totalFactor*=(tot/rootFreqs[i1])
+							totalFactor*=(tot/rootFreqs[parentBase])
 						else:
 							if contribLength:
-								tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
-								totalFactor*=tot3[i1]
+								#consider the branch length contribution 
+								partialVecWithMutation=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
+								totalFactor*=partialVecWithMutation[parentBase]
 							else:
-								totalFactor*=childEntry[-1][i1]
+								totalFactor*=childEntry[-1][parentBase]
 
 					ref_pos+=1
 					if ref_pos==lRef:
