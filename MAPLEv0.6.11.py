@@ -2625,9 +2625,17 @@ for i in range(lRef):
 	cumulativeRate.append(cumulativeRate[-1]+nonMutRates[ind])
 
 
-# get the likelihoods as they change by moving along a branch
+# Helps the likelihoods as they change by moving along a branch
 def getPartialVec(i12, totLen, mutMatrix, errorRate, vect=None, upNode=False, flag=False):
 	"""
+	When merging a non O entry with an O entry, we need to iterate through the partial likelihood
+	vector stored in the O entry. Since the non O entry currently does not have an array 
+	representing its partial likelihood, this helper function helps temporarily construct one
+	so that multiplying the partial likelihoods with the vector stored in the O entry is 
+	simpler.
+
+
+	From the original implementation:
 	When merging a CATGR-entry with an O entry, or for the case that T1=/=T2, it is useful to
 	first create the partial vectors of the entries seperately, instead of working with one 'newVec'.
 	With this function we create the partial likelihood vector for the considered entry:
@@ -4882,14 +4890,12 @@ def distancesFromRefPunishNs(data,samples=None,samplesInInitialTree=set(),forget
 	sampleDistances.sort(reverse=True,key=itemgetter(0))
 	return sampleDistances
 
-#function to calculate likelihood cost of appending node to parent node 
-# this now mostly ignores the differences in contributions of non-mutating nucleotides.
-#These calculations follow the explanations presented in section 1.5 of
-#the supplemental reading
+#function to calculate likelihood cost of appending node to parent node this now mostly ignores the differences in contributions of non-mutating nucleotides.
+
+#These calculations follow the explanations presented in section 1.5 of the supplemental reading
 def appendProbNode(probVectP,probVectC,isTipC,bLen):
 
-	#Error rates were not covered in the original MAPLE paper so we did
-	#not reimplement any functionality pertaining to errors 
+	#Note that error rates were not covered in the original MAPLE paper so we did not reimplement any functionality pertaining to errors 
 
 	### Not covered in Section 1.5 ******************************
 
@@ -4899,24 +4905,22 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 		mutMatrix=mutMatrixGlobal
 
 	##### Not covered in Section 1.5 ******************************
+
+
 	parentIndex, childIndex, totalFactor, ref_pos = 0, 0, 1.0, 0
 	parentEntry=probVectP[parentIndex] #parent
 	childEntry=probVectC[childIndex] #child
+
+	#contribLength is the branch length
 	contribLength=bLen
 
-	#did not reimplement these
+	#LKcost is the likelihood that is returned
 	Lkcost=bLen*globalTotRate
 	if usingErrorRate and isTipC:
 		Lkcost+=totError
 	
 	#loop until we reach the end of the reference 
-	prevChildIndex = -1
 	while ref_pos < lRef:
-		
-		# if prevChildIndex < childIndex+2:
-		# 	print(childIndex)
-		# 	print(prevChildIndex)
-		# prevChildIndex = childIndex
 
 		#The first bullet handles the case when either the child or parent entry
 		#has an entry = N. Here the fragment does not contribute to the likelihood
@@ -4924,8 +4928,13 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 		#parent and child entries
 		
 		if childEntry[0]==5 or parentEntry[0]==5:
-
 			if childEntry[0]==5:
+
+				#since entries of type N and R store their reference positions in index 1
+				#differently we have to update the reference position in cases
+
+				#this holds true for all other possibilities of base nodes for parent
+				#and child in this function 
 				if parentEntry[0]==5 or parentEntry[0]==4:
 					#update the reference position to which ever entry comes earlier
 					ref_pos=min(parentEntry[1],childEntry[1])
@@ -4995,10 +5004,9 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 					contribLength+=childEntry[2]
 
 			#The second bullet point, e1 and e2 are of the same type: {R,A,C,G,T}
-			#In the original MAPLE code, this case does not contribute to overall 
-			# likelihood
+
+			#update the reference position and the entries for child and parent
 			if childEntry[0] == parentEntry[0] and childEntry[0] <=4:
-				#they are both type R so they don't contribute to likelihood
 				if childEntry[0]==4:
 					ref_pos=min(parentEntry[1],childEntry[1])
 					if ref_pos==lRef:
@@ -5010,8 +5018,6 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 						childIndex+=1
 						childEntry = probVectC[childIndex]
 				else:
-					#they are both the same nucleotides so they don't contribute to the 
-					#likelihood
 					ref_pos+=1
 					if ref_pos==lRef:
 						break
@@ -5027,7 +5033,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 				#parent is R, child is A,C,G, or T
 				if parentEntry[0]==4:
 					
-					#Did not reimplement this code with flag logic
+					#Did not reimplement this code with flag  and error logic
 					flag2 = (usingErrorRate and (isTipC or (len(childEntry)>2) and childEntry[-1] ))
 					if useRateVariation:
 						mutMatrix=mutMatrices[ref_pos]
@@ -5049,9 +5055,9 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 						else:
 							if contribLength:
 								#this is the original likelihood calculation presented in the paper
-								#s log(tao1 * tao2 (l2 + c1))
-								#where l2+c1 is contribLength and tao1 and tao2 are the childEntry[1] and childEntry[0]
-								#we use bases from the child entries here since the reference is type R
+								# log(SubstitutionRate (type 1 -> type2) * (l2 + c1))
+								#where l2+c1 is contribLength and type1 and type2 is the type of the reference
+								#and the type of the child entry
 								totalFactor*=min(0.25,mutMatrix[childEntry[1]][childEntry[0]]*contribLength)
 							else:
 								return float("-inf")
@@ -5066,6 +5072,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 						parentEntry=probVectP[parentIndex]
 				#parent and child are both nucleotide types or child could be type R
 				else:
+					#Did not reimplement this code with flag and error logic
 					flag1 = (usingErrorRate and (len(parentEntry)>2) and parentEntry[-1] )
 					if useRateVariation:
 						mutMatrix=mutMatrices[ref_pos]
@@ -5090,11 +5097,10 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 							totalFactor*=(min(0.25,mutMatrix[i1][i2]*contribLength)+(flag1 + flag2)*0.33333*errorRate)
 						else:
 							if contribLength:
-								#this is the original calculation in the paper
-								#s log(tao1 * tao2 (l2 + c1))
-								#where l2+c1 is contribLength and tao1 and tao2 are the parentEntry[0] and childEntry[0] if childEntry is not type R
-								#otherwise it is parentEntry[0] and parentEntry[1]
-								#we use bases from the child entries here since the reference is type R
+								#this is the original likelihood calculation presented in the paper
+								# log(SubstitutionRate (type 1 -> type2) * (l2 + c1))
+								#where l2+c1 is contribLength and type1 and type2 is the type of the reference
+								#and the type of the child entry
 								totalFactor*=min(0.25,mutMatrix[i1][i2]*contribLength)
 							else:
 								return float("-inf")
@@ -5106,6 +5112,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 					if childEntry[0]!=4 or childEntry[1]==ref_pos:
 						childIndex+=1
 						childEntry=probVectC[childIndex]
+
 			#This is the last bullet point, where at least one of the entries is type O
 			elif parentEntry[0]==6 or childEntry[0]==6:
 				#both child and parent are type O
@@ -5118,6 +5125,7 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 						tot3=getPartialVec(6, contribLength, mutMatrix, None, vect=childEntry[-1])
 						for j in range4:
 							#sum getPartialVec results with the vector partials in the parent entry
+							#from the result of tot3, sum over v(X1)
 							tot+=parentEntry[-1][j]*tot3[j]
 					else:
 						for j in range4:
@@ -5134,24 +5142,30 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 						childEntry=probVectC[childIndex]
 				#The child entry is type {A,G,T,C,R} and parent entry is type O
 				elif childEntry[0]<=4 and parentEntry[0]==6:
+					#Did not reimplement this code with flag and error logic
 					if useRateVariation:
 						mutMatrix=mutMatrices[ref_pos]
 					#if the childEntry is type R, then we need to use the first entry
-					#in the parent as the base
+					#in the parent as the base as we can use that position to find the
+					#nucleotide at that reference position
+					
 					if childEntry[0]==4:
 		
 						i2=parentEntry[1]
 					else:
 						i2=childEntry[0]
-					
-					#Check that the base i2 has significance in the vector partials for type O
+	
 					if parentEntry[-1][i2]>0.02:
 						totalFactor*=parentEntry[-1][i2]
 					else:
+						#Did not reimplement this code with flag and error logic
 						if (usingErrorRate and (isTipC or (len(childEntry)>2) and childEntry[-1] )):
 							if errorRateSiteSpecific: errorRate = errorRates[ref_pos]
 							tot3=getPartialVec(i2, contribLength, mutMatrix, errorRate, flag=True)
 						else:
+							#this is for ease of operation when calculating the probabilities of
+							#mutating from one base to another when the entry for the child
+							#is not a partial vector
 							tot3=getPartialVec(i2, contribLength, mutMatrix, None, flag=False)
 						tot=0.0
 						for j in range4:
@@ -5168,12 +5182,14 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 						childEntry=probVectC[childIndex]
 				#parent is R child is O
 				elif parentEntry[0] == 4 and childEntry[0]==6:
+					#Did not reimplement this code with flag and error logic
 					if useRateVariation:
 						mutMatrix=mutMatrices[ref_pos]
 					i1=childEntry[1]
 					if childEntry[-1][i1]>0.02:
 						totalFactor*=childEntry[-1][i1]
 					else:
+						#Did not reimplement this code with flag and error logic
 						if len(parentEntry)==4+usingErrorRate:
 							flag1 = (usingErrorRate and (len(parentEntry)>2) and parentEntry[-1] )
 							tot=0.0
@@ -5202,16 +5218,18 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 			
 				#parent entry is [A,G,T,C], child entry is O
 				else:
+					#Did not reimplement this code with flag and error logic
 					flag1 = (usingErrorRate and (len(parentEntry)>2) and parentEntry[-1] )
 					if useRateVariation:
 						mutMatrix=mutMatrices[ref_pos]
 
 					i1=parentEntry[0]
-
+					#Did not reimplement this code with flag and error logic
 					if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[ref_pos]
 					if childEntry[-1][i1]>0.02:
 						totalFactor*=childEntry[-1][i1]
 					else:
+						#Did not reimplement this code with flag and error logic
 						if len(parentEntry)==4+usingErrorRate:
 							tot2=getPartialVec(i1, parentEntry[2], mutMatrix, errorRate, flag=flag1)
 							tot3=getPartialVec(6, contribLength, mutMatrix, errorRate, vect=childEntry[-1])
