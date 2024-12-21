@@ -3244,7 +3244,7 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 							cumulPartLk+=cumErrorRate
 			#NOT COVERED IN SECTION 1.2 ********************************************
 
-			#in the case that both types are nucleotides and are the same
+			#the case that both types the same nucleotide
 			#if they are both the same, set the new type for the entry to be this same 
 			#type, and its position is the reference positoin we are currently indexing
 			if type_1==type_2 and type_1<5: 
@@ -5269,14 +5269,6 @@ def appendProbNode(probVectP,probVectC,isTipC,bLen):
 	
 	return Lkcost+log(totalFactor)
 				
-
-				
-
-
-			
-
-
-
 
 
 
