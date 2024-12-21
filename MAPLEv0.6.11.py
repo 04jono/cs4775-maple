@@ -3017,9 +3017,10 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 	if not useRateVariation:
 		mutMatrix=mutMatrixGlobal
 
-	#our reimplementation will focus on refactoring mergeVectors and havings its implementation more closely align
+	#our reimplementation will focus on refactoring mergeVectors and having its implementation more closely align
 	#explanations provided in the supplemental reading section 1.2 
 
+	#helper function to generate new entries when oen of the entries type is N
 	def newEntryForSingleNBase(entry,new_entry_pos,blen,fromTip):
 		new_entry = ()
 		if isUpDown:
@@ -3253,19 +3254,19 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 				else:
 					new_entry=(entry1[0],entry1[1])
 					
-					if returnLK :
-						if useRateVariation:
-							cumulPartLk+=mutMatrices[pos][entry1[0]][entry1[0]]*(totLen1+totLen2)
-						else:
-							cumulPartLk+=mutMatrix[entry1[0]][entry1[0]]*(totLen1+totLen2)
-						if usingErrorRate:
-							if ((not fromTip1) and flag1) or ((not fromTip2) and flag2):
-								if errorRateSiteSpecific: cumErrorRate = errorRates[pos]
-								else: cumErrorRate = errorRate
-								if ((not fromTip1) and flag1):
-									cumulPartLk-=cumErrorRate
-								if ((not fromTip2) and flag2):
-									cumulPartLk-=cumErrorRate
+				if returnLK:
+					if useRateVariation:
+						cumulPartLk+=mutMatrices[pos][entry1[0]][entry1[0]]*(totLen1+totLen2)
+					else:
+						cumulPartLk+=mutMatrix[entry1[0]][entry1[0]]*(totLen1+totLen2)
+					if usingErrorRate:
+						if ((not fromTip1) and flag1) or ((not fromTip2) and flag2):
+							if errorRateSiteSpecific: cumErrorRate = errorRates[pos]
+							else: cumErrorRate = errorRate
+							if ((not fromTip1) and flag1):
+								cumulPartLk-=cumErrorRate
+							if ((not fromTip2) and flag2):
+								cumulPartLk-=cumErrorRate
 				
 			elif (not totLen1) and (not totLen2) and entry1[0]<5 and entry2[0]<5 and (not flag1) and (not flag2): #0 distance between different nucleotides: merge is not possible
 				if returnLK:
