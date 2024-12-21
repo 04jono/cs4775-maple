@@ -3446,125 +3446,71 @@ def findProbRoot(probVect,node=None,mutations=None,up=None):
 	return logLK
 
 def rootVector(probVect, bLen, isFromTip, tree, node):
-    tree_nodes = []
-    tree_mutations = tree.mutations
-    tree_next = tree.up
- 
-    def processNode(vec, node, isGoingUp):
-        '''Process nodes on a tree in a given direction up or down the tree'''
-        nonlocal tree_mutations, tree_nodes
-        tree_nodes.append(node)
-        if tree_mutations[node]:
-            return passGenomeListThroughBranch(vec, tree_mutations[node], isGoingUp)
-        else:
-              return vec
+	tree_nodes = []
+	tree_mutations = tree.mutations
+	tree_next = tree.up
 
-    while node is not None:
-        probVect = processNode(probVect, node, True)
-        node = tree_next[node]
-    
-    rootProbVect = []
-    index = 0
-    
-    for entry in probVect:
-        entry_type = entry[0]
-        newVector = []
-        if entry_type == 5:
-            rootProbVect.append(entry)
-        elif entry_type == 6:
-            sum_branch_length = bLen
-            
-            if len(entry) > 3:
-                sum_branch_length += entry[2]
-            
-            if sum_branch_length != 0:
-                newVector = getPartialVec(6, sum_branch_length, mutMatrixGlobal, 0, vect=entry[-1])
-                for i in range(4):
-                    newVector[i] *= rootFreqs[i]
-            else:
-                for i in range(4):
-                    newVector.append(entry[-1][i] * rootFreqs[i])
-            
-            sum_vector = sum(newVector)
-            normalized_vector = list(map(lambda x: x / sum_vector, newVector))
-            
-            rootProbVect.append((6, entry[1], normalized_vector))
-            index += 1
-        else:
-            if len(entry) == 3:
-                rootProbVect.append((entry[0], entry[1], entry[2] + bLen, 0.0))
-            else:
-                if bLen != 0:
-                    rootProbVect.append((entry[0], entry[1], bLen, 0.0))
-                else:
-                    rootProbVect.append((entry[0], entry[1]))
-            
-            if entry[0] < 4:
-                index += 1
-            else:
-                index = entry[1]
-        
-    for node in reversed(tree_nodes):
-        if tree_mutations[node]:
-            rootProbVect = passGenomeListThroughBranch(rootProbVect, tree_mutations[node], dirIsUp=False)
-    
-    shorten(rootProbVect)
-    
-    return rootProbVect
+	def processNode(vec, node, isGoingUp):
+		'''Process nodes on a tree in a given direction up or down the tree'''
+		nonlocal tree_mutations, tree_nodes
+		tree_nodes.append(node)
+		if tree_mutations[node]:
+			return passGenomeListThroughBranch(vec, tree_mutations[node], isGoingUp)
+		else:
+			return vec
 
-	# """
-	# For the root node, calculate the likelihood genome list by incorporating branch lengths and root frequencies.
-	# """
+	while node is not None:
+		probVect = processNode(probVect, node, True)
+		node = tree_next[node]
+
+	rootProbVect = []
+	index = 0
+
+	for entry in probVect:
+		entry_type = entry[0]
+		newVector = []
+		if entry_type == 5:
+			rootProbVect.append(entry)
+		elif entry_type == 6:
+			sum_branch_length = bLen
+			
+			if len(entry) > 3:
+				sum_branch_length += entry[2]
+			
+			if sum_branch_length != 0:
+				newVector = getPartialVec(6, sum_branch_length, mutMatrixGlobal, 0, vect=entry[-1])
+				for i in range(4):
+					newVector[i] *= rootFreqs[i]
+			else:
+				for i in range(4):
+					newVector.append(entry[-1][i] * rootFreqs[i])
+			
+			sum_vector = sum(newVector)
+			normalized_vector = list(map(lambda x: x / sum_vector, newVector))
+			
+			rootProbVect.append((6, entry[1], normalized_vector))
+			index += 1
+		else:
+			if len(entry) == 3:
+				rootProbVect.append((entry[0], entry[1], entry[2] + bLen, 0.0))
+			else:
+				if bLen != 0:
+					rootProbVect.append((entry[0], entry[1], bLen, 0.0))
+				else:
+					rootProbVect.append((entry[0], entry[1]))
+			
+			if entry[0] < 4:
+				index += 1
+			else:
+				index = entry[1]
 		
-	# def processEntry(entry, bLen, newPos, isFromTip):
-	#     """Process a single entry from probVect."""
-	#     if entry[0] == 5: #keeps entry as is
-	#         return entry, entry[1]
-	#     elif entry[0] == 6: #updates likelihoods using bLen and root frequencies
-	#         totBLen = bLen + (entry[2] if len(entry) > 3 else 0)
-	#         newVect = (
-	#             getPartialVec(6, totBLen, mutMatrices[newPos], 0, vect=entry[-1]) if useRateVariation else
-	#             getPartialVec(6, totBLen, mutMatrixGlobal, 0, vect=entry[-1])
-	#         ) if totBLen else [
-	#             freq * value for freq, value in zip(rootFreqs, entry[-1])
-	#         ]
-	#         totSum = sum(newVect)
-	#         newVect = [v / totSum for v in newVect]
-	#         return (6, entry[1], newVect), newPos + 1
-	#     else:
-	#         flag1 = ((len(entry) > 2) and entry[-1]) or isFromTip
-	#         newEntry = (
-	#             (entry[0], entry[1], entry[2] + bLen, 0.0, flag1) if len(entry) > 3 else
-	#             (entry[0], entry[1], bLen, 0.0, flag1) if bLen or flag1 else
-	#             (entry[0], entry[1])
-	#         )
-	#         newPos = newPos + 1 if entry[0] < 4 else entry[1]
-	#         return newEntry, newPos
-
-	# # upward tree (processing mutations) - collects nodes along upward path
-	# nodeList = []
-	# while node is not None:
-	#     nodeList.append(node)
-	#     if tree.mutations[node]:
-	#         probVect = passGenomeListThroughBranch(probVect, tree.mutations[node], dirIsUp=True)
-	#     node = tree.up[node]
-
-	# # Go through each entry in probVect
-	# newProbVect = []
-	# newPos = 0
-	# for entry in probVect:
-	#     processedEntry, newPos = processEntry(entry, bLen, newPos, isFromTip)
-	#     newProbVect.append(processedEntry)
-
-	# # Go down (reapply mutations)
-	# while nodeList:
-	#     node = nodeList.pop()
-	#     if tree.mutations[node]:
-	#         newProbVect = passGenomeListThroughBranch(newProbVect, tree.mutations[node], dirIsUp=False)
-
-	# shorten(newProbVect) #trims newProbVect - look at 'shorten'
-	# return newProbVect
-
+	for node in reversed(tree_nodes):
+		if tree_mutations[node]:
+			rootProbVect = passGenomeListThroughBranch(rootProbVect, tree_mutations[node], dirIsUp=False)
+	
+	shorten(rootProbVect)
+	
+	return rootProbVect
 
 #function to add new mutation events in new sample to the pre-exisitng pseudocounts so to improve the estimate of the substitution rates.
 # probVect1 is the genome list at the node where the appending happens; probVect2 is the genome list for the new sample.
@@ -3954,58 +3900,65 @@ def updateBLen(tree,cNode,addToList=False,nodeList=None):
 #Check if two genome lists represent the same partial likelihoods or not.
 #This is used to traverse the tree and only update genome lists if they changed after a change in the tree.
 def areVectorsDifferent(probVect1,probVect2):
-	if probVect2==None:
+	if probVect1 is None or probVect2 is None:
 		return True
-	indexEntry1, indexEntry2, pos = 0, 0, 0
-	entry1=probVect1[indexEntry1]
-	entry2=probVect2[indexEntry2]
-	while True:
-		if entry1[0]!=entry2[0]:	
+	
+	pointer1 = 0
+	pointer2 = 0
+	position = 0
+	v1 = probVect1[pointer1]
+	v2 = probVect2[pointer2]
+	
+	while position < lRef:
+		if v1[0] != v2[0] or len(v1) != len(v2):
 			return True
-		if len(entry1)!=len(entry2):
-			return True
-		if entry1[0]<5:
-			if len(entry1)>2:
-				if abs(entry1[2] - entry2[2])>thresholdProb:
+		
+		if v1[0] == 6:
+			if len(v1) == 4 and abs(v1[2] - v1[2]) > thresholdProb:
+				return True
+			
+			for i in range(4):
+				difference = abs(v1[-1][i] - v2[-1][i])
+    
+				if difference == 0:
+					continue
+ 
+				if difference > thresholdDiffForUpdate:
 					return True
-				if len(entry1)>3:
-					if abs(entry1[3] - entry2[3])>thresholdProb:
-						return True
-					if len(entry1)>4:
-						if abs(entry1[4] - entry2[4])>thresholdProb:
-							return True
-			if entry1[0]<4:
-				pos+=1
-			else:
-				pos=min(entry1[1],entry2[1])
-		elif entry1[0]==6:
-			if len(entry1)==4:
-				if abs(entry1[2] - entry2[2])>thresholdProb:
+				
+				if v1[-1][i] == 0 or v2[-1][i] == 0:
 					return True
-			for i in range4:
-				diffVal=abs(entry1[-1][i] - entry2[-1][i])
-				if diffVal:
-					if (not entry1[-1][i]) or (not entry2[-1][i]):
-						return True
-					if diffVal>thresholdDiffForUpdate or (diffVal>thresholdProb and ( (diffVal/entry1[-1][i]>thresholdFoldChangeUpdate)  or  (diffVal/entry2[-1][i]>thresholdFoldChangeUpdate))):
-						return True
-			pos+=1
+
+				if difference > thresholdProb and (
+							difference / v1[-1][i] > thresholdFoldChangeUpdate
+							or difference / v2[-1][i] > thresholdFoldChangeUpdate
+						):
+					return True
+
+			position += 1
+		elif v1[0] <= 4:
+			if len(v1) > 2 and abs(v1[2] - v2[2]) > thresholdProb:
+				return True
+			if len(v1) > 3 and abs(v1[3] - v2[3]) > thresholdProb:
+				return True
+			if len(v1) > 4 and abs(v1[4] - v2[4]) > thresholdProb:
+				return True
+			
+			position = position + 1 if (v1[0] < 4) else min(v1[1], v2[1])
 		else:
-			pos=min(entry1[1],entry2[1])
-		if pos==lRef:
+			position = min(v1[1], v2[1])
+		
+		if position == lRef:
 			break
-		if entry1[0]<4 or entry1[0]==6:
-			indexEntry1+=1
-			entry1=probVect1[indexEntry1]
-		elif pos==entry1[1]:
-			indexEntry1+=1
-			entry1=probVect1[indexEntry1]
-		if entry2[0]<4 or entry2[0]==6:
-			indexEntry2+=1
-			entry2=probVect2[indexEntry2]
-		elif pos==entry2[1]:
-			indexEntry2+=1
-			entry2=probVect2[indexEntry2]
+		
+		if v1[0] < 4 or v1[0] == 6 or position == v1[1]:
+			pointer1 += 1
+			v1 = probVect1[pointer1]
+
+		if v2[0] < 4 or v2[0] == 6 or position == v2[1]:
+			pointer2 += 1
+			v2 = probVect2[pointer2]
+
 	return False
 
 
