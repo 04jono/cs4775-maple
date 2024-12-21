@@ -3242,6 +3242,7 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 						if fromTip2:
 							cumulPartLk+=cumErrorRate
 			#NOT COVERED IN SECTION 1.2 ********************************************
+
 			#in the case that both types are nucleotides and are the same
 			#if they are both the same, set the new type for the entry to be this same 
 			#type, and its position is the reference positoin we are currently indexing
@@ -3272,11 +3273,11 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 					raise Exception("exit")
 				else:
 					return None
+				
 			#if the types are not the same or at least one of the types is O
 			#in both cases we have to calculate new partial likelihood vectors
 			else:
 				
-
 				#helper function for calculating new entries and likelihoods for
 				#cases in which a new likelihood vector is introduced 
 				def calculateNewEntry(vec1,vec2,refNuc,newPos):
@@ -3290,7 +3291,7 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 							raise Exception("exit")
 						else:
 							return None
-					#normalzie the new vector
+					#normalize the new vector
 					for i in range4:
 						vec1[i]/=totSum
 
@@ -3310,7 +3311,7 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 				#this is the third bullet point, the types of entry 1 and 2 are different
 				#but they are not type O
 				if type_1 != 6 and type_2 != 6:
-					
+	
 					if type_1==4: #the reference nucleotide is stored in entry2 if type_1 is R
 						#refNucToPass is used when simplifying the partial likelihood vector
 						refNucToPass=entry2[1]
@@ -3320,8 +3321,6 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 						i1=type_1
 					
 					#get a partial likelihood vector for entry1
-		
-			
 					if totLen1 or flag1:
 						if isUpDown and len(entry1)>3+usingErrorRate:
 							newVec = getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
@@ -3335,7 +3334,7 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 						newVec=[0.0,0.0,0.0,0.0]
 						newVec[i1]=1.0
 	
-
+					#get a partial likelihood vector for entry2
 					if entry2[0]==4:
 						i2=refNucToPass
 					else:
