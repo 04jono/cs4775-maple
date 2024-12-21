@@ -3017,6 +3017,55 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 	if not useRateVariation:
 		mutMatrix=mutMatrixGlobal
 
+	#our reimplementation will focus on refactoring mergeVectors and havings its implementation more closely align
+	#explanations provided in the supplemental reading section 1.2 
+
+	def newEntryForSingleNBase(entry,new_entry_pos,blen,fromTip):
+		new_entry = ()
+		if isUpDown:
+			if usingErrorRate:
+				if len(entry)==2:
+					if blen or fromTip:
+						new_entry =(entry[0],new_entry_pos,blen,0.0,fromTip) 
+					else:
+						new_entry=(entry[0],new_entry_pos)
+				elif len(entry)==3:
+					new_entry=(entry[0],new_entry_pos,blen,0.0,entry[3])
+				else:
+					new_entry=(entry[0],new_entry_pos,entry2[2]+blen,0.0,entry[3])
+			else:
+				if len(entry)>2:
+					new_entry=(entry[0],new_entry_pos,entry[2]+blen,0.0)
+				else:
+					if blen:
+						new_entry=(entry[0],new_entry_pos,blen,0.0)
+					else:
+						new_entry=(entry[0],new_entry_pos)
+		else:
+			if usingErrorRate:
+				if len(entry)==2:
+					if blen or fromTip:
+						new_entry=(entry[0],new_entry_pos,blen,fromTip)
+					else:
+						new_entry=(entry[0],new_entry_pos)
+				elif len(entry)==3:
+					if blen:
+						new_entry=(entry[0],new_entry_pos,blen,entry2[3])
+					else:
+						new_entry=(entry[0],new_entry_pos,entry[3])
+				else:
+					new_entry=(entry[0],new_entry_pos,entry2[2]+blen,entry[3])
+			else:
+				if len(entry)>2:
+					new_entry=(entry[0],new_entry_pos,entry[2]+blen)
+				else:
+					if blen:
+						new_entry=(entry[0],new_entry_pos,blen)
+					else:
+						new_entry=(entry[0],new_entry_pos)
+		return new_entry
+	
+	#this section is not reimplemnted as its specifications are not detailed in section 1.2
 	#contribution to non-mutation and non-error probabilities for the whole genome
 	if returnLK:
 		cumulPartLk=(bLen1+bLen2)*globalTotRate
@@ -3027,62 +3076,37 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 			if fromTip2 or numMinor2:
 				cumulPartLk+=totError*(1+numMinor2)
 
-	while True:
-		if entry1[0]==5:
-			if entry2[0]==5:
-				newPos=min(entry1[1],entry2[1])
-				probVect.append((5,newPos))
-			elif entry2[0]<5:
-				if entry2[0]<4:
-					newPos=pos+1
-					newEl=entry2[1]
-				else:
-					newPos=min(entry1[1],entry2[1])
-					newEl=newPos
-				if isUpDown:
-					if usingErrorRate:
-						if len(entry2)==2:
-							if bLen2 or fromTip2:
-								probVect.append((entry2[0],newEl,bLen2,0.0,fromTip2))
-							else:
-								probVect.append((entry2[0],newEl))
-						elif len(entry2)==3:
-							probVect.append((entry2[0],newEl,bLen2,0.0,entry2[3]))
-						else:
-							probVect.append((entry2[0],newEl,entry2[2]+bLen2,0.0,entry2[3]))
-					else:
-						if len(entry2)>2:
-							probVect.append((entry2[0],newEl,entry2[2]+bLen2,0.0))
-						else:
-							if bLen2:
-								probVect.append((entry2[0],newEl,bLen2,0.0))
-							else:
-								probVect.append((entry2[0],newEl))
-				else:
-					if usingErrorRate:
-						if len(entry2)==2:
-							if bLen2 or fromTip2:
-								probVect.append((entry2[0],newEl,bLen2,fromTip2))
-							else:
-								probVect.append((entry2[0],newEl))
-						elif len(entry2)==3:
-							if bLen2:
-								probVect.append((entry2[0],newEl,bLen2,entry2[3]))
-							else:
-								probVect.append((entry2[0],newEl,entry2[3]))
-						else:
-							probVect.append((entry2[0],newEl,entry2[2]+bLen2,entry2[3]))
-					else:
-						if len(entry2)>2:
-							probVect.append((entry2[0],newEl,entry2[2]+bLen2))
-						else:
-							if bLen2:
-								probVect.append((entry2[0],newEl,bLen2))
-							else:
-								probVect.append((entry2[0],newEl))
+	#iterate through each position in the reference
+	while pos < lRef:
+		type_1 = entry1[0]
+		type_2 = entry2[0]
 
-			else: # case entry2 is "O" and entry1 is "N"
-				newPos=pos+1
+		#the new entry to add
+		new_entry = ()
+		#the next reference position we are moving to
+		next_pos = pos
+
+		#consider the first case, when the type of either entry is N
+		if type_1 == 5 or type_2 == 5:
+			#in this case both bases are type N so the new entry should also be type N
+			if type_1 == 5 and type_2 == 5:
+				next_pos = min(entry1[1],entry2[1])
+				new_entry = (5,next_pos)
+			#in this case type_1 is N but type_2 is a nucleotide
+			elif type_2 < 4:
+				next_pos = pos + 1
+				new_entry_pos = entry2[1]
+				new_entry = newEntryForSingleNBase(entry2,new_entry_pos,bLen2,fromTip2)
+			#in this case type_1 is N but type_2 is the same as the reference
+			elif type_2 == 4:
+				next_pos = min(entry1[1],entry2[1])
+				new_entry_pos = next_pos
+				new_entry = newEntryForSingleNBase(entry2,new_entry_pos,bLen2, fromTip2)
+			#type_1 is N but type_2 is O
+			elif type_2 == 6:
+				next_pos = pos + 1
+
+				#the isUpDown is not covered in section 1.2
 				if isUpDown:
 					if useRateVariation:
 						mutMatrix=mutMatrices[pos]
@@ -3098,86 +3122,35 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 					totSum=sum(newVec)
 					for i in range4:
 						newVec[i]/=totSum
-					probVect.append((6,entry2[1],newVec))
+					new_entry = (6,entry2[1],newVec)
 
 				else:
+
+					#this checks if the entry contains a branch length
 					if len(entry2)>3:
-						probVect.append((6,entry2[1],entry2[2]+bLen2,entry2[3]))
+						new_entry = (6,entry2[1],entry2[2]+bLen2,entry2[3])
 					else:
+						# the entry does not contain a bLen but we incur one when merging
+						#the vectors
 						if bLen2:
-							probVect.append((6,entry2[1],bLen2,entry2[2]))
+							new_entry = (6,entry2[1],bLen2,entry2[2])
 						else:
-							probVect.append((6,entry2[1],entry2[2]))
+							new_entry = (6,entry2[1],entry2[2])
 
-			if returnLK:
-				cumulPartLk+=(bLen1+bLen2)*(cumulativeRate[pos]-cumulativeRate[newPos])
-				if usingErrorRate:
-					if fromTip1 or fromTip2:
-						if errorRateSiteSpecific: cumErrorRate =  cumulativeErrorRate[newPos] - cumulativeErrorRate[pos] #both this and the next one should end up being positive
-						else: cumErrorRate = errorRate * (newPos-pos)
-					if fromTip1: #here we do not remove the contribution in case numMinor1>0 since this would anyway have to be re-added at some point
-						cumulPartLk+=cumErrorRate
-					if fromTip2:
-						cumulPartLk+=cumErrorRate
-			pos=newPos
+			#type_2 is N but type_1 is a nucleotide
+			elif type_1 < 4:
+				next_pos=pos+1
+				next_entry_pos=entry1[1]
+				new_entry = newEntryForSingleNBase(entry1,next_entry_pos,bLen1,fromTip1)
+			#type_1 is R
+			elif type_1 == 4:
+				next_pos=min(entry1[1],entry2[1])
+				next_entry_pos=next_pos
+				new_entry = newEntryForSingleNBase(entry1,next_entry_pos,bLen1,fromTip1)
+			#type_1 is O
+			else:
+				next_pos=pos+1
 
-		elif entry2[0]==5: #entry2 is N
-			if entry1[0]<5:
-				if entry1[0]<4:
-					newPos=pos+1
-					newEl=entry1[1]
-				else:
-					newPos=min(entry1[1],entry2[1])
-					newEl=newPos
-				if isUpDown:
-					if usingErrorRate:
-						if len(entry1)==2:
-							if bLen1:
-								probVect.append((entry1[0],newEl,bLen1,False))
-							else:
-								probVect.append((entry1[0],newEl))
-						elif len(entry1)==3:
-							probVect.append((entry1[0],newEl,bLen1,entry1[2]))
-						elif len(entry1)==4:
-							probVect.append((entry1[0],newEl,entry1[2]+bLen1, entry1[3]))
-						else:
-							probVect.append((entry1[0],newEl,entry1[2],entry1[3]+bLen1, entry1[4]))
-					else:
-						if len(entry1)==2:
-							if bLen1:
-								probVect.append((entry1[0],newEl,bLen1))
-							else:
-								probVect.append((entry1[0],newEl))
-						elif len(entry1)==3:
-							probVect.append((entry1[0],newEl,entry1[2]+bLen1))
-						else:
-							probVect.append((entry1[0],newEl,entry1[2],entry1[3]+bLen1))
-							
-				else:
-					if usingErrorRate:
-						if len(entry1)==2:
-							if bLen1 or fromTip1:
-								probVect.append((entry1[0],newEl,bLen1,fromTip1))
-							else:
-								probVect.append((entry1[0],newEl))
-						elif len(entry1)==3:
-							if bLen1:
-								probVect.append((entry1[0],newEl,bLen1,entry1[3]))
-							else:
-								probVect.append((entry1[0],newEl,entry1[3]))
-						else:
-							probVect.append((entry1[0],newEl,entry1[2]+bLen1,entry1[3]))
-					else:
-						if len(entry1)>2:
-							probVect.append((entry1[0],newEl,entry1[2]+bLen1))
-						else:
-							if bLen1:
-								probVect.append((entry1[0],newEl,bLen1))
-							else:
-								probVect.append((entry1[0],newEl))
-			else: #entry1 is "O" and entry2 is "N"
-				newPos=pos+1
-				refNucToPass=entry1[1]
 				if isUpDown and ((len(entry1)==4 and entry1[2]>0) or bLen1):
 					if useRateVariation:
 						mutMatrix=mutMatrices[pos]
@@ -3191,29 +3164,35 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 					totSum=sum(newVec)
 					for i in range4:
 						newVec[i]/=totSum
-					probVect.append((6,entry1[1],newVec))
+					new_entry=(6,entry1[1],newVec)
 				else:
 					if len(entry1)>3:
-						probVect.append((6,entry1[1],entry1[2]+bLen1,entry1[3]))
+						new_entry = (6,entry1[1],entry1[2]+bLen1,entry1[3])
 					else:
 						if bLen1:
-							probVect.append((6,entry1[1],bLen1,entry1[2]))
+							new_entry = (6,entry1[1],bLen1,entry1[2])
 						else:
-							probVect.append((6,entry1[1],entry1[2]))
+							new_entry =(6,entry1[1],entry1[2])
+
 
 			if returnLK:
-				cumulPartLk+=(bLen1+bLen2)*(cumulativeRate[pos]-cumulativeRate[newPos])
+				cumulPartLk+=(bLen1+bLen2)*(cumulativeRate[pos]-cumulativeRate[next_pos])
 				if usingErrorRate:
 					if fromTip1 or fromTip2:
-						if errorRateSiteSpecific: cumErrorRate = cumulativeErrorRate[newPos] - cumulativeErrorRate[pos] #both this and the next one should end up being positive
-						else: cumErrorRate = errorRate * (newPos-pos)
-					if fromTip1:
+						if errorRateSiteSpecific: cumErrorRate =  cumulativeErrorRate[next_pos] - cumulativeErrorRate[pos] #both this and the next one should end up being positive
+						else: cumErrorRate = errorRate * (next_pos-pos)
+					if fromTip1: #here we do not remove the contribution in case numMinor1>0 since this would anyway have to be re-added at some point
 						cumulPartLk+=cumErrorRate
 					if fromTip2:
 						cumulPartLk+=cumErrorRate
-			pos=newPos
-				
-		else: #entry1 and entry2 are not "N"
+
+			pos=next_pos
+			probVect.append(new_entry)
+
+		#checking other cases of possible entry types
+		else: 
+
+			#NOT COVERED IN SECTION 1.2 ********************************************
 			totLen1=bLen1
 			if entry1[0]==6:
 				if len(entry1)>3:
@@ -3262,13 +3241,16 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 							cumulPartLk+=cumErrorRate
 						if fromTip2:
 							cumulPartLk+=cumErrorRate
-
-			if entry2[0]==entry1[0] and entry2[0]<5: #entry1 and entry2 are two identical nucleotides
+			#NOT COVERED IN SECTION 1.2 ********************************************
+			#in the case that both types are nucleotides and are the same
+			#if they are both the same, set the new type for the entry to be this same 
+			#type, and its position is the reference positoin we are currently indexing
+			if type_1==type_2 and type_1<5: 
 				
 				if entry1[0]==4:
-					probVect.append((4,newPos))
+					new_entry=(4,newPos)
 				else:
-					probVect.append((entry1[0],entry1[1]))
+					new_entry=(entry1[0],entry1[1])
 					
 					if returnLK :
 						if useRateVariation:
@@ -3290,17 +3272,56 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 					raise Exception("exit")
 				else:
 					return None
+			#if the types are not the same or at least one of the types is O
+			#in both cases we have to calculate new partial likelihood vectors
 			else:
+				
+
+				#helper function for calculating new entries and likelihoods for
+				#cases in which a new likelihood vector is introduced 
+				def calculateNewEntry(vec1,vec2,refNuc,newPos):
+					#multiply the new probabilities together
+					for j in range4:
+						vec1[j]*=vec2[j]
+					totSum=sum(vec1)
+					if not totSum:
+						if returnLK:
+							print("mergeVectors() returning None 2")
+							raise Exception("exit")
+						else:
+							return None
+					#normalzie the new vector
+					for i in range4:
+						vec1[i]/=totSum
+
+					state =simplify(vec1,refNuc)
+					if state==6:
+						new_entry=(6,refNuc,vec1)
+					else:
+						if state==4:
+							new_entry=(4,newPos)
+						else:
+							new_entry=(state,refNuc)
+					return new_entry, totSum
+				
 				if usingErrorRate and errorRateSiteSpecific: errorRate = errorRates[pos]
 				if useRateVariation:	mutMatrix=mutMatrices[pos]
-
-				if entry1[0]==4:
-					refNucToPass=entry2[1]
-					i1=refNucToPass
-				else:
-					refNucToPass=entry1[1]
-					i1=entry1[0]
-				if i1<=4:
+				
+				#this is the third bullet point, the types of entry 1 and 2 are different
+				#but they are not type O
+				if type_1 != 6 and type_2 != 6:
+					
+					if type_1==4: #the reference nucleotide is stored in entry2 if type_1 is R
+						#refNucToPass is used when simplifying the partial likelihood vector
+						refNucToPass=entry2[1]
+						i1=refNucToPass
+					else:
+						refNucToPass=entry1[1]
+						i1=type_1
+					
+					#get a partial likelihood vector for entry1
+		
+			
 					if totLen1 or flag1:
 						if isUpDown and len(entry1)>3+usingErrorRate:
 							newVec = getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
@@ -3313,53 +3334,78 @@ def mergeVectors(probVect1,bLen1,fromTip1,probVect2,bLen2,fromTip2,returnLK=Fals
 					else:
 						newVec=[0.0,0.0,0.0,0.0]
 						newVec[i1]=1.0
-				else:
-					if totLen1:
-						newVec=getPartialVec(6, totLen1, mutMatrix, 0, vect=entry1[-1],upNode=isUpDown)
-					else:
-						newVec=list(entry1[-1])
+	
 
-				if entry2[0]==4:
-					i2=refNucToPass
-				else:
-					i2=entry2[0]
-				if i2==6: #entry1 is a nucleotide and entry2 is "O"
-					if totLen2:
-						newVec2=getPartialVec(6, totLen2, mutMatrix, 0, vect=entry2[-1])
+					if entry2[0]==4:
+						i2=refNucToPass
 					else:
-						newVec2=entry2[-1]
-				else:
+						i2=entry2[0]
+		
 					if totLen2 or flag2:
 						newVec2 = getPartialVec(i2, totLen2, mutMatrix, errorRate, flag=flag2)
 					else:
 						newVec2 = [0.0,0.0,0.0,0.0]
 						newVec2[i2]=1.0
+					
+					#we need to merge the 2 likelihood vectors to see if we have a new 
+					#O entry, or an entry of some other type
+					new_entry,totSum = calculateNewEntry(newVec,newVec2,refNucToPass,newPos)
 
-				for j in range4:
-					newVec[j]*=newVec2[j]
-				totSum=sum(newVec)
-				if not totSum:
-					if returnLK:
-						print("mergeVectors() returning None 2")
-						raise Exception("exit")
-					else:
-						return None
-				for i in range4:
-					newVec[i]/=totSum
-
-				state =simplify(newVec,refNucToPass)
-				if state==6:
-					probVect.append((6,refNucToPass,newVec))
+				#either entry could be type O
 				else:
-					if state==4:
-						probVect.append((4,newPos))
+					if type_1==4: #the reference nucleotide is stored in entry2 if type_1 is R
+						#refNucToPass is used when simplifying the partial likelihood vector
+						refNucToPass=entry2[1]
+						i1=refNucToPass
 					else:
-						probVect.append((state,refNucToPass))
+						refNucToPass=entry1[1]
+						i1=type_1
+					#get a partial likelihood vector for entry1
+					#entry 1 is a nucleotide type
+					if i1<=4:
+						if totLen1 or flag1:
+							if isUpDown and len(entry1)>3+usingErrorRate:
+								newVec = getPartialVec(i1, entry1[2], mutMatrix, errorRate, flag=flag1)
+								for i in range4:
+									newVec[i]*=rootFreqs[i]
+								if entry1[3]+bLen1:
+									newVec = getPartialVec(6, entry1[3]+bLen1, mutMatrix, 0, vect=newVec, upNode=True)
+							else:
+								newVec=getPartialVec(i1, totLen1, mutMatrix, errorRate, flag=flag1, upNode=isUpDown)
+						else:
+							newVec=[0.0,0.0,0.0,0.0]
+							newVec[i1]=1.0
+					#entry 1 is type O 
+					else:
+						if totLen1:
+							newVec=getPartialVec(6, totLen1, mutMatrix, 0, vect=entry1[-1],upNode=isUpDown)
+						else:
+							newVec=list(entry1[-1])
 
+					if entry2[0]==4:
+						i2=refNucToPass
+					else:
+						i2=entry2[0]
+					if i2==6: #entry2 is O
+						if totLen2:
+							newVec2=getPartialVec(6, totLen2, mutMatrix, 0, vect=entry2[-1])
+						else:
+							newVec2=entry2[-1]
+					else:
+						if totLen2 or flag2:
+							newVec2 = getPartialVec(i2, totLen2, mutMatrix, errorRate, flag=flag2)
+						else:
+							newVec2 = [0.0,0.0,0.0,0.0]
+							newVec2[i2]=1.0
+					new_entry,totSum = calculateNewEntry(newVec,newVec2,refNucToPass,newPos)
+
+
+			
 				if returnLK:
 					totalFactor*=totSum
 
 			pos=newPos
+			probVect.append(new_entry)
 
 		if returnLK and totalFactor<=minimumCarryOver:
 			try:
